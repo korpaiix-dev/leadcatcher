@@ -166,16 +166,32 @@ app.get('/api/run', (req, res) => {
 
   const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
-  // Windows ships npm as npm.cmd, and Node's spawn with shell:true is
-  // flaky on some Windows setups (EINVAL). Use the .cmd directly without
-  // shell, which works in both regular Windows and sandboxed runners.
-  const isWin = process.platform === 'win32';
-  const cmd = isWin ? 'npm.cmd' : 'npm';
-  const child = spawn(cmd, args, { cwd: ROOT, shell: false });
+  // Spawn npm in a way that works on:
+  //  - normal Windows (cmd.exe /c npm)
+  //  - Codex / sandboxed Windows (some block direct .cmd execution)
+  //  - macOS / Linux (direct npm)
+  let child;
+  try {
+    const isWin = process.platform === 'win32';
+    if (isWin) {
+      // Wrap in cmd.exe — most permissive form on Windows variants
+      child = spawn('cmd.exe', ['/c', 'npm', ...args], { cwd: ROOT });
+    } else {
+      child = spawn('npm', args, { cwd: ROOT });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    send('error', { message: 'spawn failed: ' + msg });
+    send('done', { code: -1 });
+    runningJob = null;
+    runningJobName = null;
+    res.end();
+    return;
+  }
   runningJob = child;
 
-  child.stdout.on('data', (d) => send('stdout', stripAnsi(d.toString())));
-  child.stderr.on('data', (d) => send('stderr', stripAnsi(d.toString())));
+  child.stdout?.on('data', (d) => send('stdout', stripAnsi(d.toString())));
+  child.stderr?.on('data', (d) => send('stderr', stripAnsi(d.toString())));
 
   child.on('close', (code) => {
     send('done', { code });
@@ -184,11 +200,17 @@ app.get('/api/run', (req, res) => {
     res.end();
   });
 
+  // Any error after spawn (e.g. EINVAL on restricted sandboxes) goes
+  // to the SSE channel so the dashboard surfaces it instead of the
+  // process crashing the server.
   child.on('error', (err) => {
-    send('error', { message: err.message });
+    send('error', {
+      message: err.message + ' — environment may not allow child_process. Run `npm run scan` etc. from the terminal directly.',
+    });
+    send('done', { code: -1 });
     runningJob = null;
     runningJobName = null;
-    res.end();
+    try { res.end(); } catch {}
   });
 
   req.on('close', () => {
