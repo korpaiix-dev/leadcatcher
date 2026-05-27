@@ -1,0 +1,23 @@
+{
+  "name": "leadcatcher-spike",
+  "version": "0.0.1",
+  "description": "Phase 0 spike — test Playwright + Facebook hypotheses before building full app",
+  "private": true,
+  "scripts": {
+    "login": "ts-node src/login.ts",
+    "scan": "ts-node src/scan-group.ts",
+    "search": "ts-node src/search-groups.ts",
+    "join": "ts-node src/join-group.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "playwright": "^1.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

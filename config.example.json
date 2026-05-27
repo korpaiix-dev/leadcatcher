@@ -1,0 +1,26 @@
+{
+  "groups": [
+    {
+      "url": "https://www.facebook.com/groups/REPLACE_WITH_GROUP_ID",
+      "name": "ตัวอย่าง — แก้เป็นกลุ่มจริง"
+    }
+  ],
+  "keywords": [
+    "หาช่างภาพ",
+    "รับช่าง",
+    "ช่างถ่ายงานแต่ง",
+    "prewedding"
+  ],
+  "scan": {
+    "maxPostsPerGroup": 50,
+    "maxScrollAttempts": 20,
+    "delayBetweenActionsMs": [3000, 12000]
+  },
+  "join": {
+    "mode": "safe",
+    "membershipAnswers": {
+      "อาชีพ": "ช่างภาพอิสระ",
+      "ทำไม": "อยากเข้ามาเรียนรู้และแบ่งปันประสบการณ์"
+    }
+  }
+}
