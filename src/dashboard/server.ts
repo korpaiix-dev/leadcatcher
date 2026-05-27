@@ -11,6 +11,7 @@ const RESULTS_DIR = path.join(ROOT, 'data/results');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
 const LEADS_FILE = path.join(ROOT, 'data/leads.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const SESSION_DIR = path.resolve(__dirname, '../../data/session');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -75,6 +76,7 @@ app.get('/api/results', (_req, res) => {
     myGroups: [] as SearchResult[],
     myGroupsAt: 0,
     scanFiles: 0,
+    sessionExists: fs.existsSync(path.join(SESSION_DIR, 'Default')),
   };
 
   if (!fs.existsSync(RESULTS_DIR)) return res.json(out);

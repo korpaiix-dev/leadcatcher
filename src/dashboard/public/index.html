@@ -147,24 +147,7 @@
           <p class="text-sm text-slate-500 mt-1">ทำให้ครบก่อน scan</p>
         </div>
       </div>
-      <ul class="space-y-2 text-sm">
-        <li id="check-login" class="flex items-center gap-3">
-          <i data-lucide="circle" class="text-slate-300"></i>
-          <span>Login Facebook</span>
-        </li>
-        <li id="check-groups" class="flex items-center gap-3">
-          <i data-lucide="circle" class="text-slate-300"></i>
-          <span>เลือกกลุ่มอย่างน้อย 1 กลุ่ม</span>
-        </li>
-        <li id="check-keywords" class="flex items-center gap-3">
-          <i data-lucide="circle" class="text-slate-300"></i>
-          <span>เพิ่ม Keyword อย่างน้อย 1 คำ</span>
-        </li>
-        <li id="check-scan" class="flex items-center gap-3">
-          <i data-lucide="circle" class="text-slate-300"></i>
-          <span>Scan แล้วอย่างน้อย 1 ครั้ง</span>
-        </li>
-      </ul>
+      <ul id="checklist" class="space-y-2 text-sm"></ul>
     </div>
 
     <div class="card p-6">
@@ -386,30 +369,26 @@ function renderStats() {
   $('#stat-won').textContent       = data.posts.filter(p => p.status === 'won').length;
 }
 
-function checkItem(id, done) {
-  const li = $(id);
-  if (!li) return;
-  const i = li.querySelector('i');
-  if (done) {
-    i.setAttribute('data-lucide', 'check-circle-2');
-    i.classList.remove('text-slate-300');
-    i.classList.add('text-emerald-600');
-    li.querySelector('span').classList.add('text-slate-900');
-  } else {
-    i.setAttribute('data-lucide', 'circle');
-    i.classList.add('text-slate-300');
-    i.classList.remove('text-emerald-600');
-    li.querySelector('span').classList.remove('text-slate-900');
-  }
-}
-
 function renderChecklist() {
-  // login: hard to detect from here, but if mygroups has results OR sessions exist, assume yes.
-  const hasMyGroups = data.myGroups && data.myGroups.length > 0;
-  checkItem('#check-login',    hasMyGroups || data.scanFiles > 0 || data.searches.length > 0);
-  checkItem('#check-groups',   (config?.groups?.length || 0) > 0);
-  checkItem('#check-keywords', (config?.keywords?.length || 0) > 0);
-  checkItem('#check-scan',     data.scanFiles > 0);
+  const items = [
+    ['Login Facebook',                 !!data.sessionExists],
+    ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม',     (config?.groups?.length || 0) > 0],
+    ['เพิ่ม Keyword อย่างน้อย 1 คำ',     (config?.keywords?.length || 0) > 0],
+    ['Scan แล้วอย่างน้อย 1 ครั้ง',       data.scanFiles > 0],
+  ];
+  const ul = $('#checklist');
+  ul.innerHTML = '';
+  for (const [label, done] of items) {
+    const li = el('li', { class: 'flex items-center gap-3' });
+    li.appendChild(el('i', {
+      'data-lucide': done ? 'check-circle-2' : 'circle',
+      class: done ? 'text-emerald-600' : 'text-slate-300',
+    }));
+    li.appendChild(el('span', {
+      class: done ? 'text-slate-900 font-medium' : 'text-slate-500',
+    }, label));
+    ul.appendChild(li);
+  }
 }
 
 function renderKeywords() {
