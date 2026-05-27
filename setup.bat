@@ -39,10 +39,9 @@ git rev-parse --git-dir >nul 2>&1
 if not errorlevel 1 goto git_ready
 echo [..] Initializing fresh git repo...
 git init -b main
-git config user.email "korpaiix@gmail.com"
-git config user.name "korpaiix"
+REM Don't hardcode user identity — use whatever git is already configured globally
 git add .
-git commit -m "Initial commit"
+git -c user.email=lc@localhost -c user.name=lc commit -m "Initial commit"
 :git_ready
 git config core.autocrlf true
 git config core.filemode false
