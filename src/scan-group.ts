@@ -5,6 +5,7 @@ import { humanDelay, humanScroll } from './lib/human';
 import { log } from './lib/logger';
 import { FB_SELECTORS } from './lib/selectors';
 import { loadConfig, saveResults } from './lib/session';
+import { debugScreenshot } from './lib/fb-groups';
 import { GroupConfig, PostMatch } from './types';
 
 async function tryText(article: Locator, selectors: string[]): Promise<string> {
@@ -31,6 +32,38 @@ async function tryAttr(article: Locator, selectors: string[], attr: string): Pro
   return '';
 }
 
+/**
+ * Last-ditch content extractor: grab the largest text block inside the article
+ * that doesn't look like a button label or timestamp. Used when FB_SELECTORS
+ * for postContent don't match.
+ */
+async function fallbackContent(article: Locator): Promise<string> {
+  try {
+    const text = await article.evaluate((el) => {
+      const candidates: string[] = [];
+      // Walk all divs and find ones with sizeable text
+      const divs = el.querySelectorAll('div');
+      for (const div of Array.from(divs)) {
+        // Skip if it has too many child elements (probably a container)
+        if (div.children.length > 6) continue;
+        const t = (div as HTMLElement).innerText?.trim() || '';
+        // Skip too-short or too-long content
+        if (t.length < 20 || t.length > 3000) continue;
+        // Skip if it's mostly numbers/symbols (timestamps, counters)
+        const letters = (t.match(/[฀-๿a-zA-Z]/g) || []).length;
+        if (letters / t.length < 0.4) continue;
+        candidates.push(t);
+      }
+      // pick the longest unique candidate
+      candidates.sort((a, b) => b.length - a.length);
+      return candidates[0] || '';
+    });
+    return (text || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 interface ExtractedPost {
   author: string;
   content: string;
@@ -43,7 +76,9 @@ async function extractPost(
   article: Locator,
   keywords: string[]
 ): Promise<ExtractedPost | null> {
-  const content = await tryText(article, FB_SELECTORS.postContent);
+  // Try centralised selectors first, then fall back to a content sweep
+  let content = await tryText(article, FB_SELECTORS.postContent);
+  if (!content) content = await fallbackContent(article);
   if (!content) return null;
 
   const lower = content.toLowerCase();
@@ -77,26 +112,32 @@ async function scanGroup(
   log.info(`เปิดกลุ่ม: ${group.name}`);
   await page.goto(group.url, { waitUntil: 'domcontentloaded' });
   await humanDelay(3000, 6000);
+  log.info(`  URL จริง: ${page.url()}`);
 
   const seen = new Set<string>();
   const matches: PostMatch[] = [];
+  let totalSeenArticles = 0;
 
   for (let scroll = 0; scroll < maxScrolls && matches.length < maxPosts; scroll++) {
     const articles = page.locator(FB_SELECTORS.groupPosts[0]);
     const count = await articles.count();
     log.info(
-      `  Scroll ${scroll + 1}/${maxScrolls} — เจอ ${count} articles (matched ${matches.length})`
+      `  Scroll ${scroll + 1}/${maxScrolls} — บนหน้านี้ ${count} articles (match แล้ว ${matches.length}, เคยเห็น ${totalSeenArticles})`
     );
 
     for (let i = 0; i < count && matches.length < maxPosts; i++) {
       const article = articles.nth(i);
       const extracted = await extractPost(article, keywords);
-      if (!extracted || !extracted.url) continue;
-      if (seen.has(extracted.url)) continue;
-      seen.add(extracted.url);
+      totalSeenArticles++;
+      if (!extracted) continue;
+      // dedupe by URL when we have one, else by author+content prefix
+      const dedupeKey = extracted.url || `${extracted.author}::${extracted.content.slice(0, 60)}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
 
       const postId =
-        extracted.url.split('/').filter(Boolean).pop() || extracted.url;
+        (extracted.url && extracted.url.split('/').filter(Boolean).pop()) ||
+        dedupeKey;
 
       matches.push({
         postId,
@@ -105,7 +146,7 @@ async function scanGroup(
         author: extracted.author,
         content: extracted.content,
         postedAt: extracted.postedAt,
-        url: extracted.url,
+        url: extracted.url || group.url,
         matchedKeywords: extracted.matchedKeywords,
         scrapedAt: new Date().toISOString(),
       });
@@ -118,6 +159,11 @@ async function scanGroup(
     await humanDelay(delayRange[0], delayRange[1]);
   }
 
+  // Save a screenshot per group so we can diagnose 0-result runs
+  const safeName = (group.name || group.url).replace(/[^\w฀-๿]/g, '_').slice(0, 40);
+  await debugScreenshot(page, `scan-${safeName}`);
+
+  log.info(`  สรุปกลุ่ม ${group.name}: เห็น ${totalSeenArticles} โพสต์ / match ${matches.length}`);
   return matches;
 }
 
@@ -130,6 +176,10 @@ async function main(): Promise<void> {
   const config = loadConfig();
   if (!config.groups || config.groups.length === 0) {
     log.err('config.json ยังไม่มีกลุ่ม — เพิ่ม URL กลุ่มก่อน');
+    process.exit(1);
+  }
+  if (!config.keywords || config.keywords.length === 0) {
+    log.err('config.json ยังไม่มี keyword — เพิ่มอย่างน้อย 1 คำ');
     process.exit(1);
   }
 
@@ -152,12 +202,15 @@ async function main(): Promise<void> {
         config.scan.delayBetweenActionsMs
       );
       allMatches.push(...matches);
-      log.ok(`กลุ่ม ${group.name}: เจอ ${matches.length} โพสต์`);
+      if (matches.length === 0) {
+        log.warn(`กลุ่ม ${group.name}: เจอ 0 โพสต์ — ดู data/screenshots/scan-*.png เพื่อตรวจ DOM`);
+      } else {
+        log.ok(`กลุ่ม ${group.name}: เจอ ${matches.length} โพสต์`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.err(`กลุ่ม ${group.name}: error — ${msg}`);
     }
-    // long break between groups to look human
     await humanDelay(15000, 30000);
   }
 
@@ -165,6 +218,13 @@ async function main(): Promise<void> {
   const filePath = saveResults(filename, allMatches);
   log.ok(`บันทึกผลที่ ${filePath}`);
   log.ok(`รวมทั้งหมด ${allMatches.length} match`);
+
+  if (allMatches.length > 0) {
+    log.info('ตัวอย่าง 5 โพสต์แรก:');
+    for (const m of allMatches.slice(0, 5)) {
+      log.ok(`  • [${m.matchedKeywords.join(',')}] ${m.author}: ${m.content.slice(0, 80)}...`);
+    }
+  }
 
   await context.close();
 }
