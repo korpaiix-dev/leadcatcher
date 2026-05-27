@@ -1,115 +1,92 @@
-# LeadCatcher — Phase 0 Spike
+# LeadCatcher
 
-Proof-of-concept ก่อนสร้าง full Electron app — ทดสอบ 3 สมมุติฐานหลัก:
+เครื่องมือช่วย SME หา Lead จาก Facebook Groups — สแกนโพสต์ตาม keyword ที่ตั้งไว้ในกลุ่มที่เลือก เพื่อให้เข้าไปคอมเมนต์/inbox ได้เร็วกว่าคู่แข่ง
 
-1. Playwright login Facebook ได้และ save session ข้ามรอบเปิดได้
-2. เข้ากลุ่มที่เป็นสมาชิกแล้ว scroll หาโพสต์ที่ match keyword ได้
-3. ค้นกลุ่มใหม่ + auto-join ได้ในขอบเขตที่ปลอดภัย
-
-ถ้า 3 ข้อนี้ผ่านหมด → ลงทุนทำ Phase 1 MVP
+มี **dashboard เว็บ local** ที่ทำงานบนเครื่องคุณเอง — ไม่ส่งข้อมูลออกนอก ไม่ต้องสมัครบริการ
 
 ---
 
-## Setup
+## ก่อนเริ่ม — สิ่งที่ต้องติดตั้งก่อน (one-time)
 
-### ครั้งแรก (one-time setup)
+ติดตั้ง 2 อย่างนี้บน Windows ก่อน:
 
-โปรเจ็คนี้สร้างจาก sandbox ที่ลบไฟล์บน Windows mount ไม่ได้ ทำให้มี `.git.broken*` กับ `.git_seed` ค้างอยู่ — รัน setup script ก่อนหนึ่งครั้งเพื่อจัดเรียบ:
+1. **Node.js LTS** → [nodejs.org](https://nodejs.org/) (กด Download LTS แล้วติดตั้งแบบ Next-Next-Next)
+2. **Git for Windows** → [git-scm.com/downloads/win](https://git-scm.com/downloads/win)
 
-**Windows:**
+ทดสอบใน CMD ว่าใช้ได้:
 ```cmd
+node --version
+git --version
+```
+ถ้าทั้งคู่แสดงเวอร์ชั่น = พร้อม
+
+---
+
+## วิธีติดตั้งโปรเจ็ค
+
+```cmd
+git clone <repo URL ที่เพื่อนส่งให้>
+cd leadcatcher
 setup.bat
 ```
 
-**macOS / Linux:**
-```bash
-bash setup.sh
-```
+`setup.bat` จะ:
+- ลง dependencies (npm + Playwright + Chromium ~130MB) — รอบแรกใช้ 1-3 นาที
+- สร้าง `config.json` ให้ (จาก template)
+- **เปิด Dashboard อัตโนมัติ** ที่ `http://localhost:3737`
 
-Script จะ:
-- ลบโฟลเดอร์ `.git.broken*` ที่ค้างอยู่
-- เปลี่ยน `.git_seed` → `.git` (เก็บ commit history ที่ Claude ทำให้)
-- ถ้า seed ไม่อยู่ ก็ git init ใหม่และ commit แรก
-
-### Dependencies
-
-```bash
-npm install
-npx playwright install chromium
-
-# คัดลอก config แล้วแก้ตามต้องการ
-cp config.example.json config.json
-```
-
-แก้ `config.json`:
-- `groups` — ใส่ URL กลุ่ม Facebook ที่คุณเป็นสมาชิกอยู่
-- `keywords` — keyword ที่ต้องการ track
+หลังจากนั้นทุกครั้งที่เปิด — แค่ดับเบิ้ลคลิก `launch.bat` อย่างเดียว
 
 ---
 
-## วิธีใช้
+## วิธีใช้ Dashboard
 
-### 1. Login (ทำครั้งเดียวต่อ session)
+ที่หน้า dashboard มี **Setup Checklist** ติ๊กให้ครบ 4 ข้อ:
 
-```bash
-npm run login
-```
+### 1. Login Facebook
+- กดปุ่ม **Login Facebook** ที่หน้า Overview
+- Chromium เปิดขึ้น → login ในนั้น (ใช้ **account สำรอง** ดีกว่า account หลัก)
+- Login เสร็จ ระบบ detect เอง — ปิด Chromium ได้
 
-Chromium จะเปิดขึ้น → login Facebook ในหน้าต่างนั้น → ระบบ detect login สำเร็จเอง → session ถูก save ไว้ใน `data/session/`
+### 2. เลือกกลุ่ม
+ไป tab **Groups** มี 3 ทาง:
+- **กลุ่มที่ฉันเข้าอยู่** — กด "โหลดกลุ่มของฉัน" → เลือกหลายกลุ่ม → กด "+ เพิ่มที่เลือก"
+- **ค้นหากลุ่มใหม่** — พิมพ์ keyword หากลุ่มใหม่ → เลือก → กด "Join + Add ที่เลือก" (ระบบ join ให้)
+- **วาง URL เอง** — paste link กลุ่มใส่ตรงๆ
 
-### 2. Scan กลุ่มที่ตั้งไว้ใน config
+### 3. ใส่ Keyword
+ไป tab **Keywords** → พิมพ์คำที่อยากตามหา → กด Enter ทีละคำ
 
-```bash
-npm run scan
-```
+### 4. Scan
+กลับ Overview → กด **▶ Scan Groups** สีเขียว → รอผล (Chromium จะ scroll เอง)
 
-ระบบจะวนทุกกลุ่มใน `config.json`, scroll หาโพสต์ที่ match keyword, แล้วบันทึกผลที่ `data/results/scan-<timestamp>.json`
-
-### 3. ค้นหากลุ่มใหม่จาก keyword
-
-```bash
-npm run search -- "งานแต่งงาน"
-```
-
-ระบบไปที่หน้า Facebook Groups Search, ดึงรายชื่อกลุ่ม + จำนวนสมาชิก, บันทึกที่ `data/results/search-<query>-<ts>.json`
-
-### 4. Auto-join กลุ่ม
-
-```bash
-npm run join -- "https://www.facebook.com/groups/123456"
-```
-
-โหมดอ่านจาก `config.json` → `join.mode`:
-- `safe` (default) — delay 30-90 วินาที, ให้ user ตอบ membership question เอง
-- `normal` — delay 5-15 วินาที
-- `aggressive` — delay 2-5 วินาที (เสี่ยงสูง — อย่าใช้ใน 7 วันแรกของ account)
+ผลลัพธ์ออกที่ tab **Lead Posts** — มีปุ่ม "เปิดใน Facebook" + ปุ่ม "ติดต่อแล้ว / ปิดดีล / ไม่สนใจ"
 
 ---
 
-## โครงสร้าง project
+## ⚠️ คำเตือนสำคัญ
 
-```
-leadcatcher-spike/
-├── src/
-│   ├── lib/
-│   │   ├── browser.ts       # Playwright context + persistent session
-│   │   ├── human.ts         # Random delay, human-like scroll
-│   │   ├── selectors.ts     # FB selectors (centralized)
-│   │   ├── session.ts       # Config loader + result saver
-│   │   └── logger.ts        # CLI logger
-│   ├── types.ts             # TypeScript interfaces
-│   ├── login.ts             # script 1
-│   ├── scan-group.ts        # script 2
-│   ├── search-groups.ts     # script 3
-│   └── join-group.ts        # script 4
-├── data/                    # gitignored — session + results
-├── config.json              # gitignored — ของจริง
-├── config.example.json      # template
-└── package.json
+- **ใช้ FB account สำรอง** ไม่ใช่ account หลัก
+- **อย่ารัน aggressive mode** ใน 7 วันแรกของ account ใหม่
+- ทุก action มี random delay 3-15 วินาที — **อย่าลด**
+- ถ้า FB ขึ้น **CAPTCHA** → หยุดใช้ทันที 24 ชั่วโมง
+- ระบบ **ไม่ comment แทน** — เตรียมโพสต์ + ลิงก์ให้คุณไปคอมเมนต์เอง
+
+---
+
+## CLI (ทางเลือก ไม่ต้องใช้ dashboard)
+
+```cmd
+npm run login                 :: login FB ครั้งเดียว
+npm run mygroups              :: ดึงรายชื่อกลุ่มที่เข้าอยู่
+npm run search -- "งานแต่ง"   :: ค้นกลุ่มใหม่
+npm run join -- "<url>"       :: ขอเข้ากลุ่ม
+npm run scan                  :: สแกนตาม config
+npm run dashboard             :: เปิด dashboard
 ```
 
 ---
 
-## ⚠️ คำเตือน
+## License & Disclaimer
 
-- **ใช้ FB account สำรอง** ไม่
+ใช้งานบนความรับผิดชอบของผู้ใช้เอง — โปรเจ็คนี้ไม่ใช่ official Facebook tool การใช้ Playwright อัตโนมัติบน Facebook อาจขัด ToS ใช้กับ account สำรองและในขอบเขตที่สมเหตุสมผลเสมอ
