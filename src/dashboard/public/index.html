@@ -444,6 +444,101 @@ function renderScanList() {
   }
 }
 
+// selection state, keyed by URL — used for both my-groups and search results
+const selected = { mygroups: new Set(), search: new Set() };
+
+function groupCard(g, opts) {
+  const { kind, inList } = opts;
+  const isSelected = selected[kind].has(g.url);
+  const alreadyIn = inList.has(g.url);
+
+  const card = el('div', {
+    class: 'border rounded-lg p-3 transition cursor-pointer ' +
+      (alreadyIn
+        ? 'border-emerald-200 bg-emerald-50/50'
+        : isSelected
+          ? 'border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/30'
+          : 'border-slate-200 hover:border-slate-300'),
+    onclick: (e) => {
+      if (alreadyIn) return;
+      if (e.target.closest('a, button')) return;
+      if (isSelected) selected[kind].delete(g.url);
+      else selected[kind].add(g.url);
+      if (kind === 'mygroups') renderMyGroups();
+      else renderSearches();
+    },
+  });
+
+  const top = el('div', { class:'flex items-start gap-2 mb-2' });
+  // checkbox indicator (visual only)
+  if (alreadyIn) {
+    const ok = el('div', { class:'text-emerald-600 mt-0.5' });
+    ok.appendChild(icon('check-square'));
+    top.appendChild(ok);
+  } else {
+    const cb = el('div', { class: isSelected ? 'text-indigo-600 mt-0.5' : 'text-slate-300 mt-0.5' });
+    cb.appendChild(icon(isSelected ? 'check-square' : 'square'));
+    top.appendChild(cb);
+  }
+  top.appendChild(el('div', { class:'flex-1 min-w-0' },
+    el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.name }, g.name),
+    g.memberCountText ? el('div', { class:'text-xs text-slate-500' }, g.memberCountText + (g.privacy && g.privacy !== 'unknown' ? ' • ' + g.privacy : '')) : null
+  ));
+  card.appendChild(top);
+
+  const row = el('div', { class:'flex gap-2 mt-2' });
+  row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost', onclick: (e) => e.stopPropagation() },
+    icon('external-link'), 'เปิด'));
+  row.appendChild(el('button', {
+    class: 'btn ' + (alreadyIn ? 'btn-ghost' : 'btn-success'),
+    onclick: async (e) => {
+      e.stopPropagation();
+      if (alreadyIn) return;
+      await addGroup(g.url, g.name);
+      renderAll(); lucide.createIcons();
+    }
+  }, icon(alreadyIn ? 'check' : 'plus'), alreadyIn ? 'อยู่ใน list' : 'เพิ่มทันที'));
+  card.appendChild(row);
+  return card;
+}
+
+function bulkToolbar(kind, items, inList) {
+  const available = items.filter(g => !inList.has(g.url));
+  const sel = selected[kind];
+  // prune selection to only available items
+  for (const url of [...sel]) if (!available.some(g => g.url === url)) sel.delete(url);
+
+  const bar = el('div', { class:'card p-3 mb-3 flex flex-wrap items-center gap-3' });
+  bar.appendChild(el('button', {
+    class:'btn btn-ghost',
+    onclick: () => { for (const g of available) sel.add(g.url); rerender(); }
+  }, icon('check-circle'), 'เลือกทั้งหมด'));
+  bar.appendChild(el('button', {
+    class:'btn btn-ghost',
+    onclick: () => { sel.clear(); rerender(); }
+  }, icon('x-circle'), 'ยกเลิก'));
+  bar.appendChild(el('span', { class:'text-sm text-slate-500 mr-auto' },
+    `เลือกแล้ว ${sel.size} / ${available.length} (ยังไม่อยู่ใน list)`));
+  bar.appendChild(el('button', {
+    class:'btn btn-success',
+    disabled: sel.size === 0 ? '' : null,
+    onclick: async () => {
+      const toAdd = items.filter(g => sel.has(g.url));
+      const n = await addGroupsBulk(toAdd);
+      sel.clear();
+      alert(`เพิ่ม ${n} กลุ่มเข้า Scan List แล้ว`);
+      renderAll(); lucide.createIcons();
+    }
+  }, icon('plus-square'), `+ เพิ่มที่เลือก (${sel.size})`));
+  return bar;
+
+  function rerender() {
+    if (kind === 'mygroups') renderMyGroups();
+    else renderSearches();
+    lucide.createIcons();
+  }
+}
+
 function renderMyGroups() {
   const wrap = $('#mygroups');
   wrap.innerHTML = '';
@@ -466,28 +561,14 @@ function renderMyGroups() {
     return;
   }
 
+  // bulk toolbar above the grid
+  wrap.parentElement.insertBefore(bulkToolbar('mygroups', data.myGroups, inList), wrap);
+  // remove old toolbars that may have stacked from previous renders
+  const toolbars = wrap.parentElement.querySelectorAll('.card.mb-3');
+  toolbars.forEach((t, i) => { if (i < toolbars.length - 1) t.remove(); });
+
   for (const g of data.myGroups) {
-    const card = el('div', { class:'border border-slate-200 rounded-lg p-3 hover:border-slate-300 hover:shadow-sm transition' });
-    card.appendChild(el('div', { class:'flex items-start gap-2 mb-2' },
-      (() => { const wrap = el('div', { class:'text-indigo-600 mt-0.5' }); wrap.appendChild(icon('users')); return wrap; })(),
-      el('div', { class:'flex-1 min-w-0' },
-        el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.name }, g.name),
-        g.memberCountText ? el('div', { class:'text-xs text-slate-500' }, g.memberCountText) : null
-      )
-    ));
-    const row = el('div', { class:'flex gap-2 mt-2' });
-    row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost' },
-      (() => { const i = icon('external-link'); return i; })(), 'เปิด'));
-    const inAlready = inList.has(g.url);
-    row.appendChild(el('button', {
-      class: 'btn ' + (inAlready ? 'btn-ghost' : 'btn-success'),
-      onclick: async () => { if (!inAlready) { await addGroup(g.url, g.name); renderAll(); lucide.createIcons(); } }
-    },
-      (() => { const i = icon(inAlready ? 'check' : 'plus'); return i; })(),
-      inAlready ? 'ใน list แล้ว' : 'เพิ่มเข้า Scan List'
-    ));
-    card.appendChild(row);
-    wrap.appendChild(card);
+    wrap.appendChild(groupCard(g, { kind: 'mygroups', inList }));
   }
 }
 
@@ -504,6 +585,14 @@ function renderSearches() {
     return;
   }
   const inList = new Set((config?.groups || []).map(g => g.url));
+
+  // Combine all visible search results so the single 'search' selection set works
+  const combinedResults = [];
+  for (const s of data.searches.slice(0, 3)) {
+    for (const g of s.results) if (!combinedResults.some(x => x.url === g.url)) combinedResults.push(g);
+  }
+  wrap.appendChild(bulkToolbar('search', combinedResults, inList));
+
   for (const s of data.searches.slice(0, 3)) {
     const block = el('div', { class:'mb-4' });
     const header = el('div', { class:'flex items-center justify-between mb-2' });
@@ -516,32 +605,12 @@ function renderSearches() {
         await fetch('/api/search/' + encodeURIComponent(s.file), { method:'DELETE' });
         refresh();
       }
-    }, (() => icon('trash-2'))(), 'ลบ'));
+    }, icon('trash-2'), 'ลบ'));
     block.appendChild(header);
 
     const grid = el('div', { class:'grid grid-cols-1 md:grid-cols-2 gap-3' });
     for (const g of s.results) {
-      const card = el('div', { class:'border border-slate-200 rounded-lg p-3 hover:border-slate-300 hover:shadow-sm transition' });
-      card.appendChild(el('div', { class:'flex items-start gap-2 mb-2' },
-        (() => { const wrap = el('div', { class:'text-indigo-600 mt-0.5' }); wrap.appendChild(icon('users')); return wrap; })(),
-        el('div', { class:'flex-1 min-w-0' },
-          el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.name }, g.name),
-          el('div', { class:'text-xs text-slate-500' }, `${g.memberCountText || '?'} • ${g.privacy || ''}`)
-        )
-      ));
-      const row = el('div', { class:'flex gap-2' });
-      row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost' },
-        (() => icon('external-link'))(), 'เปิด'));
-      const inAlready = inList.has(g.url);
-      row.appendChild(el('button', {
-        class: 'btn ' + (inAlready ? 'btn-ghost' : 'btn-success'),
-        onclick: async () => { if (!inAlready) { await addGroup(g.url, g.name); renderAll(); lucide.createIcons(); } }
-      },
-        (() => icon(inAlready ? 'check' : 'plus'))(),
-        inAlready ? 'ใน list' : 'เพิ่ม'
-      ));
-      card.appendChild(row);
-      grid.appendChild(card);
+      grid.appendChild(groupCard(g, { kind: 'search', inList }));
     }
     block.appendChild(grid);
     wrap.appendChild(block);
@@ -665,6 +734,21 @@ async function addGroup(url, name) {
   config.groups.push({ url, name: name || url });
   await saveConfig();
   return true;
+}
+
+async function addGroupsBulk(items) {
+  if (!config) return 0;
+  config.groups = config.groups || [];
+  const existing = new Set(config.groups.map(g => g.url));
+  let added = 0;
+  for (const g of items) {
+    if (!g.url || g.url.includes('REPLACE_WITH_GROUP_ID') || existing.has(g.url)) continue;
+    config.groups.push({ url: g.url, name: g.name || g.url });
+    existing.add(g.url);
+    added++;
+  }
+  if (added > 0) await saveConfig();
+  return added;
 }
 async function clearList() {
   if (!confirm('ลบกลุ่มทั้งหมดออกจาก scan list?')) return;

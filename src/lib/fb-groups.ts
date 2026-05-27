@@ -43,7 +43,19 @@ export async function extractGroupsFromPage(page: Page): Promise<SearchResult[]>
       if (NON_GROUP_SEGMENTS.has(slug)) continue;
 
       const canonical = `https://www.facebook.com/groups/${slug}`;
-      const text = ((await a.textContent({ timeout: 500 }).catch(() => null)) || '').trim();
+      // Prefer the first <span>/heading inside the anchor — FB renders the
+      // name in one node and the "ใช้งานล่าสุด X" timestamp in a sibling.
+      let text = await a.evaluate((el) => {
+        const heading = el.querySelector('span[dir="auto"], h2, h3, [role="heading"]');
+        const raw = (heading && heading.textContent) || el.textContent || '';
+        return raw.trim();
+      }).catch(() => '');
+      // Strip common trailing noise so the name stays clean
+      text = text
+        .replace(/ใช้งานล่าสุด.*$/u, '')
+        .replace(/Last active.*$/iu, '')
+        .replace(/\s+·\s+.*$/u, '')
+        .trim();
 
       const existing = map.get(canonical);
       if (!existing) {
