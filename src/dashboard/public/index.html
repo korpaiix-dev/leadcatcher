@@ -13,6 +13,15 @@
     .status-lost      { background:#f3f4f6; color:#6b7280; }
     .console-line { white-space: pre-wrap; }
     .step-badge { width: 28px; height: 28px; }
+    body.console-open { padding-right: 420px; }
+    body.console-open header { padding-right: 420px; }
+    #console { display: none; }
+    #console.open { display: flex; }
+    @media (max-width: 1024px) {
+      body.console-open { padding-right: 0; }
+      body.console-open header { padding-right: 0; }
+      #console { width: 100% !important; max-width: 420px; }
+    }
   </style>
 </head>
 <body class="bg-stone-50 text-stone-900 min-h-screen pb-24">
@@ -23,7 +32,12 @@
     <h1 class="text-lg font-semibold">LeadCatcher</h1>
     <p class="text-xs text-stone-500">Local dashboard — เปิดในเบราว์เซอร์ ทำงานบนเครื่องคุณ</p>
   </div>
-  <div id="job-indicator" class="text-sm text-stone-500"></div>
+  <div class="flex items-center gap-3">
+    <div id="job-indicator" class="text-sm text-stone-500"></div>
+    <button id="console-toggle" class="px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-100 text-sm flex items-center gap-1.5" title="Toggle output log">
+      <span>📜</span><span>Log</span>
+    </button>
+  </div>
 </header>
 
 <main class="max-w-[1400px] mx-auto p-6 space-y-6">
@@ -162,20 +176,20 @@
 
 </main>
 
-<!-- Output console -->
-<div id="console" class="fixed bottom-0 left-0 right-0 bg-stone-900 text-stone-100 shadow-2xl hidden flex flex-col" style="max-height: 50vh;">
-  <div class="flex items-center justify-between px-4 py-2 border-b border-stone-700">
-    <div class="flex items-center gap-3">
+<!-- Output console (right sidebar, toggleable) -->
+<aside id="console" class="fixed top-0 right-0 bottom-0 w-[420px] bg-stone-900 text-stone-100 shadow-2xl z-20 flex-col hidden">
+  <div class="flex items-center justify-between px-4 py-2.5 border-b border-stone-700 shrink-0">
+    <div class="flex items-center gap-2 min-w-0">
       <span class="font-mono text-xs">Output</span>
-      <span id="console-title" class="text-xs text-stone-400"></span>
+      <span id="console-title" class="text-xs text-stone-400 truncate"></span>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 shrink-0">
       <button id="console-clear" class="text-xs text-stone-400 hover:text-white">clear</button>
-      <button id="console-close" class="text-xs text-stone-400 hover:text-white text-lg">×</button>
+      <button id="console-close" class="text-stone-400 hover:text-white text-lg leading-none">×</button>
     </div>
   </div>
-  <pre id="console-out" class="overflow-y-auto p-3 text-xs font-mono flex-1"></pre>
-</div>
+  <pre id="console-out" class="overflow-y-auto p-3 text-xs font-mono flex-1 m-0"></pre>
+</aside>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -491,13 +505,32 @@ async function setStatus(url, status) {
 // ---------- Jobs (SSE) ----------
 //
 let activeES = null;
+function openConsole(title) {
+  const c = $('#console');
+  c.classList.add('open');
+  c.classList.remove('hidden');
+  document.body.classList.add('console-open');
+  localStorage.setItem('consoleOpen', '1');
+  if (title != null) $('#console-title').textContent = title;
+}
+function closeConsole() {
+  const c = $('#console');
+  c.classList.remove('open');
+  c.classList.add('hidden');
+  document.body.classList.remove('console-open');
+  localStorage.setItem('consoleOpen', '0');
+}
+function toggleConsole() {
+  if ($('#console').classList.contains('open')) closeConsole();
+  else openConsole();
+}
 function showConsole(title) {
-  $('#console').classList.remove('hidden');
-  $('#console-title').textContent = title;
+  // for backwards compat — open + reset
+  openConsole(title);
   $('#console-out').textContent = '';
 }
 function hideConsole() {
-  $('#console').classList.add('hidden');
+  closeConsole();
   if (activeES) { activeES.close(); activeES = null; }
 }
 function appendConsole(line, cls = '') {
@@ -588,8 +621,12 @@ document.querySelectorAll('.grouptab-btn').forEach(btn => {
   });
 });
 
-$('#console-close').addEventListener('click', hideConsole);
+$('#console-close').addEventListener('click', closeConsole);
 $('#console-clear').addEventListener('click', () => { $('#console-out').textContent = ''; });
+$('#console-toggle').addEventListener('click', toggleConsole);
+
+// Restore last console open/close state
+if (localStorage.getItem('consoleOpen') === '1') openConsole();
 
 refresh();
 setInterval(refresh, 10000);
