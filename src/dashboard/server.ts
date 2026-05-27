@@ -166,7 +166,12 @@ app.get('/api/run', (req, res) => {
 
   const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
-  const child = spawn('npm', args, { cwd: ROOT, shell: true });
+  // Windows ships npm as npm.cmd, and Node's spawn with shell:true is
+  // flaky on some Windows setups (EINVAL). Use the .cmd directly without
+  // shell, which works in both regular Windows and sandboxed runners.
+  const isWin = process.platform === 'win32';
+  const cmd = isWin ? 'npm.cmd' : 'npm';
+  const child = spawn(cmd, args, { cwd: ROOT, shell: false });
   runningJob = child;
 
   child.stdout.on('data', (d) => send('stdout', stripAnsi(d.toString())));

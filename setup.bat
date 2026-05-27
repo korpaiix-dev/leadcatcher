@@ -35,6 +35,11 @@ if exist node_modules\.express-* for /d %%D in (node_modules\.express-*) do rmdi
 if exist node_modules\.open-* for /d %%D in (node_modules\.open-*) do rmdir /s /q "%%D"
 
 REM ---------- Step 4: ensure git repo exists ----------
+REM Some Windows setups (Codex sandboxes, OneDrive, network drives) have
+REM file owners that differ from the running user; git refuses to touch
+REM the repo until we mark the dir as safe. Do that first, unconditionally.
+for /f "delims=" %%P in ('cd') do git config --global --add safe.directory "%%P" 2>nul
+
 git rev-parse --git-dir >nul 2>&1
 if not errorlevel 1 goto git_ready
 echo [..] Initializing fresh git repo...
