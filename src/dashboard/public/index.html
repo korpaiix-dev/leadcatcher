@@ -539,7 +539,6 @@ function groupCard(g, opts) {
 function bulkToolbar(kind, items, inList) {
   const available = items.filter(g => !inList.has(g.url));
   const sel = selected[kind];
-  // prune selection to only available items
   for (const url of [...sel]) if (!available.some(g => g.url === url)) sel.delete(url);
 
   const bar = el('div', { class:'card p-3 mb-3 flex flex-wrap items-center gap-3' });
@@ -552,18 +551,58 @@ function bulkToolbar(kind, items, inList) {
     onclick: () => { sel.clear(); rerender(); }
   }, icon('x-circle'), 'ยกเลิก'));
   bar.appendChild(el('span', { class:'text-sm text-slate-500 mr-auto' },
-    `เลือกแล้ว ${sel.size} / ${available.length} (ยังไม่อยู่ใน list)`));
-  bar.appendChild(el('button', {
-    class:'btn btn-success',
-    disabled: sel.size === 0 ? '' : null,
-    onclick: async () => {
-      const toAdd = items.filter(g => sel.has(g.url));
-      const n = await addGroupsBulk(toAdd);
-      sel.clear();
-      alert(`เพิ่ม ${n} กลุ่มเข้า Scan List แล้ว`);
-      renderAll(); lucide.createIcons();
-    }
-  }, icon('plus-square'), `+ เพิ่มที่เลือก (${sel.size})`));
+    `เลือกแล้ว ${sel.size} / ${available.length}`));
+
+  if (kind === 'search') {
+    // Search results — user is NOT a member; bulk action = join then add
+    bar.appendChild(el('button', {
+      class:'btn btn-ghost',
+      disabled: sel.size === 0 ? '' : null,
+      onclick: async () => {
+        const toAdd = items.filter(g => sel.has(g.url));
+        const n = await addGroupsBulk(toAdd);
+        sel.clear();
+        alert(`เพิ่ม ${n} กลุ่มเข้า Scan List (ยังไม่ join — ใช้กับกลุ่มที่คุณเป็นสมาชิกอยู่แล้ว)`);
+        renderAll(); lucide.createIcons();
+      }
+    }, icon('plus'), `แค่เพิ่ม (${sel.size})`));
+
+    bar.appendChild(el('button', {
+      class:'btn btn-success',
+      disabled: sel.size === 0 ? '' : null,
+      onclick: async () => {
+        const toJoin = items.filter(g => sel.has(g.url));
+        const minSec = 30, maxSec = 90; // matches safe mode
+        const estMin = Math.round((toJoin.length * (minSec + maxSec) / 2) / 60);
+        const ok = confirm(
+          `Join ${toJoin.length} กลุ่ม ตามคิว (safe mode)?\n\n` +
+          `• Chromium จะเปิดและขอเข้าทีละกลุ่ม\n` +
+          `• แต่ละกลุ่ม delay 30-90 วินาที (กันโดน FB flag)\n` +
+          `• คาดว่าใช้เวลาประมาณ ${estMin} นาที\n` +
+          `• กลุ่มที่มีคำถามคัดกรอง: หน้าต่าง Chromium จะเปิดให้ตอบเอง (รอ 5 นาทีต่อกลุ่ม)\n\n` +
+          `เริ่มเลยมั้ย?`
+        );
+        if (!ok) return;
+        sel.clear();
+        rerender();
+        await bulkJoinSequential(toJoin);
+      }
+    }, icon('log-in'), `Join + Add ที่เลือก (${sel.size})`));
+  } else {
+    // My-joined-groups — user IS a member; bulk action = just add
+    bar.appendChild(el('button', {
+      class:'btn btn-success',
+      disabled: sel.size === 0 ? '' : null,
+      onclick: async () => {
+        const toAdd = items.filter(g => sel.has(g.url));
+        const n = await addGroupsBulk(toAdd);
+        sel.clear();
+        alert(`เพิ่ม ${n} กลุ่มเข้า Scan List แล้ว`);
+        renderAll(); lucide.createIcons();
+      }
+    }, icon('plus-square'), `+ เพิ่มที่เลือก (${sel.size})`));
+  }
+
   return bar;
 
   function rerender() {
@@ -571,6 +610,24 @@ function bulkToolbar(kind, items, inList) {
     else renderSearches();
     lucide.createIcons();
   }
+}
+
+// Process a list of groups one at a time — wait for each join to finish
+// before kicking off the next. Logs progress to the output console.
+async function bulkJoinSequential(items) {
+  for (let i = 0; i < items.length; i++) {
+    const g = items[i];
+    appendConsole('', '');
+    appendConsole(`=== Join ${i+1}/${items.length}: ${g.name} ===`, 'text-cyan-300');
+    window.__pendingJoin = { url: g.url, name: g.name };
+    await new Promise((resolve) => {
+      const handler = () => { document.removeEventListener('jobDone', handler); resolve(); };
+      document.addEventListener('jobDone', handler);
+      runJob('join', g.url, `Join ${i+1}/${items.length}: ${g.name}`);
+    });
+  }
+  appendConsole('', '');
+  appendConsole(`✓ Bulk join เสร็จ ${items.length} กลุ่ม`, 'text-green-300');
 }
 
 function renderMyGroups() {
@@ -851,17 +908,19 @@ function runJob(command, arg, label) {
         es.close(); activeES = null;
         $('#job-indicator').textContent = '';
         // If a join just finished successfully, add the group to scan list
-        if (msg.payload.code === 0 && window.__pendingJoin) {
-          const pj = window.__pendingJoin;
-          window.__pendingJoin = null;
-          addGroup(pj.url, pj.name).then(added => {
+        const finishWith = async () => {
+          if (msg.payload.code === 0 && window.__pendingJoin) {
+            const pj = window.__pendingJoin;
+            window.__pendingJoin = null;
+            const added = await addGroup(pj.url, pj.name);
             if (added) appendConsole('+ เพิ่ม "' + pj.name + '" เข้า Scan List แล้ว', 'text-green-300');
-            refresh();
-          });
-        } else {
-          if (msg.payload.code !== 0) window.__pendingJoin = null;
-          refresh();
-        }
+          } else if (msg.payload.code !== 0) {
+            window.__pendingJoin = null;
+          }
+          await refresh();
+          document.dispatchEvent(new Event('jobDone'));
+        };
+        finishWith();
       }
     } catch {}
   };
@@ -869,7 +928,9 @@ function runJob(command, arg, label) {
     appendConsole('— connection closed —', 'text-slate-500');
     es.close(); activeES = null;
     $('#job-indicator').textContent = '';
+    window.__pendingJoin = null;
     refresh();
+    document.dispatchEvent(new Event('jobDone'));
   };
 }
 
