@@ -1,13 +1,14 @@
 {
   "name": "leadcatcher-spike",
   "version": "0.0.1",
-  "description": "Phase 0 spike — test Playwright + Facebook hypotheses before building full app",
+  "description": "Phase 0 spike — Playwright + Facebook lead scanner",
   "private": true,
   "scripts": {
     "login": "ts-node src/login.ts",
     "scan": "ts-node src/scan-group.ts",
     "search": "ts-node src/search-groups.ts",
     "join": "ts-node src/join-group.ts",
+    "mygroups": "ts-node src/list-mygroups.ts",
     "dashboard": "ts-node src/dashboard/server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"

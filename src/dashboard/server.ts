@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { AppConfig, PostMatch } from '../types';
+import { AppConfig, PostMatch, SearchResult } from '../types';
 
 const PORT = 3737;
 const ROOT = path.resolve(__dirname, '../..');
@@ -33,7 +33,7 @@ app.post('/api/config', (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------- Results aggregator ----------
+// ---------- Lead status ----------
 interface LeadRecord {
   status: 'new' | 'contacted' | 'won' | 'lost';
   notes?: string;
@@ -54,10 +54,26 @@ function saveLeads(leads: Record<string, LeadRecord>) {
   fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), 'utf-8');
 }
 
+app.post('/api/lead', (req, res) => {
+  const { url, status, notes } = req.body as {
+    url: string;
+    status: LeadRecord['status'];
+    notes?: string;
+  };
+  if (!url || !status) return res.status(400).json({ error: 'url and status required' });
+  const leads = loadLeads();
+  leads[url] = { status, notes, updatedAt: new Date().toISOString() };
+  saveLeads(leads);
+  res.json({ ok: true });
+});
+
+// ---------- Results aggregator ----------
 app.get('/api/results', (_req, res) => {
   const out = {
     posts: [] as Array<PostMatch & { status: string; notes?: string }>,
-    searches: [] as Array<{ file: string; query: string; results: unknown[] }>,
+    searches: [] as Array<{ file: string; query: string; results: SearchResult[]; at: number }>,
+    myGroups: [] as SearchResult[],
+    myGroupsAt: 0,
     scanFiles: 0,
   };
 
@@ -66,10 +82,12 @@ app.get('/api/results', (_req, res) => {
   const files = fs.readdirSync(RESULTS_DIR);
   const leads = loadLeads();
   const seen = new Set<string>();
+  let newestMyGroupsTime = 0;
 
   for (const file of files) {
     const filePath = path.join(RESULTS_DIR, file);
     try {
+      const stat = fs.statSync(filePath);
       const raw = fs.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(raw);
 
@@ -87,36 +105,34 @@ app.get('/api/results', (_req, res) => {
         }
       } else if (file.startsWith('search-')) {
         const query = file.replace(/^search-/, '').replace(/-\d+\.json$/, '');
-        out.searches.push({ file, query, results: Array.isArray(data) ? data : [] });
+        out.searches.push({
+          file, query,
+          results: Array.isArray(data) ? data : [],
+          at: stat.mtimeMs,
+        });
+      } else if (file.startsWith('mygroups-')) {
+        // keep the most recent one only
+        if (stat.mtimeMs > newestMyGroupsTime) {
+          newestMyGroupsTime = stat.mtimeMs;
+          out.myGroups = Array.isArray(data) ? data : [];
+          out.myGroupsAt = stat.mtimeMs;
+        }
       }
     } catch {
       // ignore malformed result files
     }
   }
 
-  // newest first
   out.posts.sort(
     (a, b) => new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime()
   );
+  out.searches.sort((a, b) => b.at - a.at);
+
   res.json(out);
 });
 
-// ---------- Lead status ----------
-app.post('/api/lead', (req, res) => {
-  const { url, status, notes } = req.body as {
-    url: string;
-    status: LeadRecord['status'];
-    notes?: string;
-  };
-  if (!url || !status) return res.status(400).json({ error: 'url and status required' });
-  const leads = loadLeads();
-  leads[url] = { status, notes, updatedAt: new Date().toISOString() };
-  saveLeads(leads);
-  res.json({ ok: true });
-});
-
-// ---------- Run a CLI command with Server-Sent Events ----------
-const ALLOWED = new Set(['login', 'scan', 'search', 'join']);
+// ---------- Run a CLI command (Server-Sent Events) ----------
+const ALLOWED = new Set(['login', 'scan', 'search', 'join', 'mygroups']);
 
 app.get('/api/run', (req, res) => {
   const command = String(req.query.command || '');
@@ -146,7 +162,6 @@ app.get('/api/run', (req, res) => {
   send('start', { command, arg });
   runningJobName = command;
 
-  // strip color codes so the browser console stays readable
   const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
   const child = spawn('npm', args, { cwd: ROOT, shell: true });
@@ -186,8 +201,6 @@ app.get('/api/status', (_req, res) => {
 app.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n  Dashboard ready: ${url}\n`);
-
-  // open the user's default browser
   try {
     const open = require('open');
     if (typeof open === 'function') {
@@ -196,6 +209,6 @@ app.listen(PORT, () => {
       open.default(url).catch(() => {});
     }
   } catch {
-    // open may not be installed yet; the URL is logged above
+    // open may not be installed; the URL is logged above
   }
 });
