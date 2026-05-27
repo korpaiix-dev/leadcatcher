@@ -8,14 +8,18 @@
     "scan": "ts-node src/scan-group.ts",
     "search": "ts-node src/search-groups.ts",
     "join": "ts-node src/join-group.ts",
+    "dashboard": "ts-node src/dashboard/server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
+    "express": "^4.19.0",
+    "open": "^8.4.2",
     "playwright": "^1.45.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0"

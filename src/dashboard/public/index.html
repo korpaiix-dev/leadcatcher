@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeadCatcher Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Sukhumvit Set", sans-serif; }
+    .status-new       { background:#eff6ff; color:#1e40af; }
+    .status-contacted { background:#fef3c7; color:#92400e; }
+    .status-won       { background:#dcfce7; color:#166534; }
+    .status-lost      { background:#f3f4f6; color:#6b7280; }
+    .console-line { white-space: pre-wrap; }
+  </style>
+</head>
+<body class="bg-stone-50 text-stone-900 min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-stone-200 bg-white px-6 py-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-semibold">LeadCatcher</h1>
+    <p class="text-xs text-stone-500">Local dashboard — runs in your browser, talks to your machine</p>
+  </div>
+  <div id="job-indicator" class="text-sm text-stone-500"></div>
+</header>
+
+<main class="grid grid-cols-12 gap-6 p-6 max-w-[1400px] mx-auto">
+
+  <!-- LEFT COLUMN -->
+  <aside class="col-span-12 lg:col-span-3 space-y-6">
+
+    <section class="bg-white rounded-lg border border-stone-200 p-4 space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-stone-500">Actions</h2>
+
+      <button id="btn-login" class="w-full px-4 py-2 rounded bg-stone-900 text-white hover:bg-stone-700 transition">
+        Login Facebook
+      </button>
+
+      <div class="flex gap-2">
+        <input id="search-q" placeholder="ค้นกลุ่ม…"
+               class="flex-1 px-3 py-2 rounded border border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-400" />
+        <button id="btn-search" class="px-4 py-2 rounded bg-stone-200 hover:bg-stone-300 transition">
+          Search
+        </button>
+      </div>
+
+      <button id="btn-scan" class="w-full px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 transition">
+        Scan Groups
+      </button>
+    </section>
+
+    <section class="bg-white rounded-lg border border-stone-200 p-4 space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-stone-500">Stats</h2>
+      <div id="stats" class="space-y-1 text-sm text-stone-600">Loading…</div>
+    </section>
+
+    <section class="bg-white rounded-lg border border-stone-200 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-stone-500">Keywords</h2>
+        <button id="btn-edit-config" class="text-xs text-stone-500 hover:text-stone-900">edit</button>
+      </div>
+      <div id="keywords" class="flex flex-wrap gap-1.5"></div>
+    </section>
+
+    <section class="bg-white rounded-lg border border-stone-200 p-4 space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-stone-500">Groups</h2>
+      <div id="groups" class="space-y-1 text-sm"></div>
+    </section>
+
+  </aside>
+
+  <!-- RIGHT COLUMN -->
+  <section class="col-span-12 lg:col-span-9 space-y-4">
+
+    <!-- Tabs -->
+    <div class="bg-white rounded-lg border border-stone-200">
+      <div class="flex border-b border-stone-200">
+        <button data-tab="leads"    class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-stone-900">Lead Posts</button>
+        <button data-tab="searches" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-stone-500 hover:text-stone-900">Group Search Results</button>
+      </div>
+
+      <!-- Leads tab -->
+      <div id="tab-leads" class="p-4">
+        <div class="flex items-center gap-3 mb-3 text-sm">
+          <select id="filter-status" class="px-3 py-1.5 rounded border border-stone-300">
+            <option value="">ทุกสถานะ</option>
+            <option value="new">ใหม่</option>
+            <option value="contacted">ติดต่อแล้ว</option>
+            <option value="won">ปิดดีล</option>
+            <option value="lost">ไม่สนใจ</option>
+          </select>
+          <input id="filter-q" placeholder="ค้นในข้อความ…"
+                 class="flex-1 px-3 py-1.5 rounded border border-stone-300" />
+          <span id="post-count" class="text-stone-500 text-sm whitespace-nowrap"></span>
+        </div>
+        <div id="posts" class="space-y-2"></div>
+      </div>
+
+      <!-- Searches tab -->
+      <div id="tab-searches" class="p-4 hidden">
+        <div id="search-results"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Output console (slide-up panel) -->
+<div id="console" class="fixed bottom-0 left-0 right-0 bg-stone-900 text-stone-100 shadow-2xl hidden flex flex-col" style="max-height: 50vh;">
+  <div class="flex items-center justify-between px-4 py-2 border-b border-stone-700">
+    <div class="flex items-center gap-3">
+      <span class="font-mono text-xs">Output</span>
+      <span id="console-title" class="text-xs text-stone-400"></span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="console-clear" class="text-xs text-stone-400 hover:text-white">clear</button>
+      <button id="console-close" class="text-xs text-stone-400 hover:text-white">×</button>
+    </div>
+  </div>
+  <pre id="console-out" class="overflow-y-auto p-3 text-xs font-mono flex-1"></pre>
+</div>
+
+<script>
+//
+// ---------- helpers ----------
+//
+const $ = (s) => document.querySelector(s);
+const el = (tag, props={}, ...children) => {
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(props)) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (k === 'html') e.innerHTML = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    e.append(c.nodeType ? c : document.createTextNode(c));
+  }
+  return e;
+};
+const fmtDate = (iso) => {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('th-TH', { hour12: false });
+  } catch { return iso; }
+};
+
+//
+// ---------- state ----------
+//
+let config = null;
+let data = { posts: [], searches: [], scanFiles: 0 };
+let filterStatus = '';
+let filterQ = '';
+let activeTab = 'leads';
+
+//
+// ---------- data fetch ----------
+//
+async function loadConfig() {
+  const r = await fetch('/api/config');
+  if (!r.ok) return null;
+  return r.json();
+}
+async function loadResults() {
+  const r = await fetch('/api/results');
+  return r.json();
+}
+
+async function refresh() {
+  [config, data] = await Promise.all([loadConfig(), loadResults()]);
+  renderConfig();
+  renderStats();
+  renderPosts();
+  renderSearches();
+}
+
+//
+// ---------- renderers ----------
+//
+function renderConfig() {
+  if (!config) {
+    $('#keywords').innerHTML = '<span class="text-xs text-stone-400">ไม่พบ config.json</span>';
+    $('#groups').innerHTML = '';
+    return;
+  }
+  $('#keywords').innerHTML = '';
+  for (const k of config.keywords || []) {
+    $('#keywords').appendChild(
+      el('span', { class:'px-2 py-0.5 rounded bg-stone-100 text-xs text-stone-700 border border-stone-200' }, k)
+    );
+  }
+  $('#groups').innerHTML = '';
+  if (!config.groups?.length) {
+    $('#groups').innerHTML = '<span class="text-xs text-stone-400">ยังไม่มีกลุ่ม — ใช้ Search หรือแก้ config.json</span>';
+  } else {
+    for (const g of config.groups) {
+      $('#groups').appendChild(
+        el('div', { class:'truncate text-stone-700', title: g.url }, '• ' + (g.name || g.url))
+      );
+    }
+  }
+}
+
+function renderStats() {
+  const total = data.posts.length;
+  const byStatus = data.posts.reduce((acc, p) => {
+    acc[p.status] = (acc[p.status] || 0) + 1;
+    return acc;
+  }, {});
+  $('#stats').innerHTML = `
+    <div>Lead posts: <b>${total}</b></div>
+    <div>ใหม่: <b>${byStatus.new || 0}</b></div>
+    <div>ติดต่อแล้ว: <b>${byStatus.contacted || 0}</b></div>
+    <div>ปิดดีล: <b class="text-emerald-700">${byStatus.won || 0}</b></div>
+    <div>Search runs: <b>${data.searches.length}</b></div>
+    <div>Scan files: <b>${data.scanFiles}</b></div>
+  `;
+}
+
+function renderPosts() {
+  const list = data.posts
+    .filter(p => !filterStatus || p.status === filterStatus)
+    .filter(p => !filterQ || (p.content || '').toLowerCase().includes(filterQ.toLowerCase()));
+
+  $('#post-count').textContent = `${list.length} โพสต์`;
+  $('#posts').innerHTML = '';
+
+  if (list.length === 0) {
+    $('#posts').appendChild(
+      el('div', { class:'text-center text-stone-400 py-8 text-sm' },
+         data.posts.length === 0 ? 'ยังไม่มีผลลัพธ์ — กด Scan Groups เพื่อเริ่ม' : 'ไม่มีโพสต์ตรงกับฟิลเตอร์')
+    );
+    return;
+  }
+
+  for (const p of list) {
+    const card = el('div', { class:'border border-stone-200 rounded p-3 bg-white hover:bg-stone-50' });
+
+    const top = el('div', { class:'flex items-start justify-between gap-3 mb-2' });
+    top.appendChild(el('div', { class:'flex-1 min-w-0' },
+      el('div', { class:'text-sm font-medium text-stone-900' }, p.author || '(ไม่ทราบผู้โพสต์)'),
+      el('div', { class:'text-xs text-stone-500' }, (p.groupName || '') + (p.postedAt ? ' • ' + p.postedAt : ''))
+    ));
+    top.appendChild(el('span', { class:`text-xs px-2 py-0.5 rounded status-${p.status}` }, p.status));
+    card.appendChild(top);
+
+    card.appendChild(el('div', { class:'text-sm text-stone-700 whitespace-pre-wrap break-words mb-2' },
+      (p.content || '').slice(0, 400) + ((p.content || '').length > 400 ? '…' : '')
+    ));
+
+    // matched keywords
+    const kw = el('div', { class:'flex flex-wrap gap-1 mb-2' });
+    for (const k of p.matchedKeywords || []) {
+      kw.appendChild(el('span', { class:'text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900' }, k));
+    }
+    card.appendChild(kw);
+
+    // actions
+    const actions = el('div', { class:'flex items-center gap-2 text-xs' });
+    actions.appendChild(el('a', {
+      href: p.url, target:'_blank', rel:'noopener',
+      class:'px-2 py-1 rounded bg-stone-900 text-white hover:bg-stone-700'
+    }, 'เปิดใน Facebook'));
+
+    const statuses = [
+      ['contacted','ติดต่อแล้ว','bg-amber-100 text-amber-800 hover:bg-amber-200'],
+      ['won','ปิดดีล','bg-emerald-100 text-emerald-800 hover:bg-emerald-200'],
+      ['lost','ไม่สนใจ','bg-stone-100 text-stone-600 hover:bg-stone-200'],
+    ];
+    for (const [s, label, cls] of statuses) {
+      actions.appendChild(el('button', {
+        class:`px-2 py-1 rounded ${cls}`,
+        onclick: () => setStatus(p.url, s),
+      }, label));
+    }
+    actions.appendChild(el('span', { class:'text-stone-400 ml-auto' }, 'scraped ' + fmtDate(p.scrapedAt)));
+
+    card.appendChild(actions);
+    $('#posts').appendChild(card);
+  }
+}
+
+function renderSearches() {
+  const target = $('#search-results');
+  target.innerHTML = '';
+  if (data.searches.length === 0) {
+    target.appendChild(el('div', { class:'text-center text-stone-400 py-8 text-sm' },
+      'ยังไม่ได้ search กลุ่ม — กรอกคำแล้วกด Search ทางซ้าย'));
+    return;
+  }
+  // newest file first
+  const sorted = [...data.searches].sort((a, b) => b.file.localeCompare(a.file));
+  for (const s of sorted) {
+    const block = el('div', { class:'border border-stone-200 rounded mb-4 bg-white' });
+    block.appendChild(el('div', { class:'px-4 py-2 border-b bg-stone-50 text-sm font-medium' },
+      `Search: "${s.query}" — ${s.results.length} กลุ่ม`));
+    const grid = el('div', { class:'p-2 grid grid-cols-1 md:grid-cols-2 gap-2' });
+    for (const g of s.results) {
+      const card = el('div', { class:'border border-stone-200 rounded p-2 hover:bg-stone-50' });
+      card.appendChild(el('div', { class:'font-medium text-sm truncate', title: g.name }, g.name));
+      card.appendChild(el('div', { class:'text-xs text-stone-500' },
+        `${g.memberCountText || '?'} • ${g.privacy || ''}`));
+      const row = el('div', { class:'flex gap-2 mt-2 text-xs' });
+      row.appendChild(el('a', {
+        href: g.url, target:'_blank', rel:'noopener',
+        class:'px-2 py-1 rounded bg-stone-200 hover:bg-stone-300'
+      }, 'เปิด'));
+      row.appendChild(el('button', {
+        class:'px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700',
+        onclick: () => addGroup(g.url, g.name),
+      }, '+ เพิ่มเข้า scan list'));
+      card.appendChild(row);
+      grid.appendChild(card);
+    }
+    block.appendChild(grid);
+    target.appendChild(block);
+  }
+}
+
+async function addGroup(url, name) {
+  if (!config) return;
+  config.groups = config.groups || [];
+  if (config.groups.some(g => g.url === url)) {
+    alert('กลุ่มนี้อยู่ในลิสต์แล้ว');
+    return;
+  }
+  config.groups.push({ url, name });
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(config) });
+  renderConfig();
+}
+
+async function setStatus(url, status) {
+  await fetch('/api/lead', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ url, status }),
+  });
+  // optimistic
+  const p = data.posts.find(p => p.url === url);
+  if (p) p.status = status;
+  renderStats();
+  renderPosts();
+}
+
+//
+// ---------- run jobs via SSE ----------
+//
+let activeES = null;
+function showConsole(title) {
+  $('#console').classList.remove('hidden');
+  $('#console-title').textContent = title;
+  $('#console-out').textContent = '';
+}
+function hideConsole() {
+  $('#console').classList.add('hidden');
+  if (activeES) {
+    activeES.close();
+    activeES = null;
+  }
+}
+function appendConsole(line, cls = '') {
+  const out = $('#console-out');
+  const span = document.createElement('div');
+  span.className = 'console-line ' + cls;
+  span.textContent = line;
+  out.appendChild(span);
+  out.scrollTop = out.scrollHeight;
+}
+
+function setJobIndicator(text) {
+  $('#job-indicator').textContent = text;
+}
+
+function runJob(command, arg, label) {
+  if (activeES) {
+    alert('มีงานกำลังรันอยู่ — รอให้เสร็จก่อน');
+    return;
+  }
+  showConsole(label || command);
+  setJobIndicator('▶ ' + (label || command));
+  const url = '/api/run?command=' + encodeURIComponent(command) + (arg ? '&arg=' + encodeURIComponent(arg) : '');
+  const es = new EventSource(url);
+  activeES = es;
+  es.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'start')   appendConsole('▶ started: ' + JSON.stringify(msg.payload), 'text-cyan-300');
+      else if (msg.type === 'stdout') appendConsole(msg.payload, '');
+      else if (msg.type === 'stderr') appendConsole(msg.payload, 'text-amber-300');
+      else if (msg.type === 'error')  appendConsole('✗ ' + msg.payload.message, 'text-red-400');
+      else if (msg.type === 'done') {
+        appendConsole('✓ exited with code ' + msg.payload.code,
+          msg.payload.code === 0 ? 'text-green-300' : 'text-red-400');
+        es.close();
+        activeES = null;
+        setJobIndicator('');
+        refresh();
+      }
+    } catch {}
+  };
+  es.onerror = () => {
+    appendConsole('— connection closed —', 'text-stone-500');
+    es.close();
+    activeES = null;
+    setJobIndicator('');
+    refresh();
+  };
+}
+
+//
+// ---------- wiring ----------
+//
+$('#btn-login').addEventListener('click', () => runJob('login', null, 'Login Facebook'));
+
+$('#btn-scan').addEventListener('click', () => {
+  if (!config?.groups?.length) {
+    alert('ยังไม่มีกลุ่มใน scan list — กด Search หากลุ่มก่อน หรือเพิ่มในการ์ดผลลัพธ์');
+    return;
+  }
+  runJob('scan', null, 'Scan Groups');
+});
+
+$('#btn-search').addEventListener('click', () => {
+  const q = $('#search-q').value.trim();
+  if (!q) { alert('ใส่ keyword ก่อน'); return; }
+  runJob('search', q, 'Search: ' + q);
+});
+$('#search-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-search').click(); });
+
+$('#btn-edit-config').addEventListener('click', () => {
+  alert('แก้ config.json ใน editor ของคุณ แล้วกด Refresh (F5)');
+});
+
+$('#filter-status').addEventListener('change', (e) => { filterStatus = e.target.value; renderPosts(); });
+$('#filter-q').addEventListener('input', (e) => { filterQ = e.target.value; renderPosts(); });
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const on = b.dataset.tab === activeTab;
+      b.className = 'tab-btn px-4 py-3 text-sm font-medium border-b-2 ' +
+        (on ? 'border-stone-900' : 'border-transparent text-stone-500 hover:text-stone-900');
+    });
+    $('#tab-leads').classList.toggle('hidden', activeTab !== 'leads');
+    $('#tab-searches').classList.toggle('hidden', activeTab !== 'searches');
+  });
+});
+
+$('#console-close').addEventListener('click', hideConsole);
+$('#console-clear').addEventListener('click', () => { $('#console-out').textContent = ''; });
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

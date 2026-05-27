@@ -50,13 +50,11 @@ if errorlevel 1 goto npm_fail
 echo [OK] npm dependencies ready.
 
 REM ---------- Step 6: playwright install chromium ----------
-if exist "%LOCALAPPDATA%\ms-playwright\chromium-1117" goto skip_pw
-if exist "%LOCALAPPDATA%\ms-playwright\chromium-*" goto skip_pw
+REM Always run — playwright detects what's already installed and skips. Fast.
 echo.
-echo [..] Downloading Chromium for Playwright (about 130MB, 1-3 minutes)...
+echo [..] Ensuring Chromium for Playwright is installed...
 call npx --yes playwright install chromium
 if errorlevel 1 goto pw_fail
-:skip_pw
 echo [OK] Chromium ready.
 
 REM ---------- Step 7: create config.json from template ----------
@@ -70,18 +68,17 @@ echo ===============================================
 echo   Setup complete!
 echo ===============================================
 echo.
-echo Next steps:
-echo   1. Edit config.json - add your Facebook group URLs and keywords
-echo   2. npm run login          (one-time, opens browser to log in)
-echo   3. npm run search -- "wedding"
-echo   4. npm run scan
+echo To launch the dashboard, double-click launch.bat
+echo (or run: npm run dashboard)
 echo.
+pause
 goto end
 
 :npm_fail
 echo.
 echo [FAIL] npm install failed. Make sure Node.js is installed:
 echo        https://nodejs.org/  (download LTS)
+pause
 goto end
 
 :pw_fail
@@ -89,8 +86,7 @@ echo.
 echo [FAIL] Playwright Chromium download failed.
 echo        Check your internet connection and retry:
 echo        npx playwright install chromium
+pause
 goto end
 
 :end
-echo.
-pause
