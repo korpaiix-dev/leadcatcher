@@ -205,6 +205,13 @@
 
     <!-- Search tab -->
     <div id="gtab-search" class="p-6 hidden">
+      <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 mb-4 text-sm text-amber-900 flex items-start gap-2">
+        <i data-lucide="info" class="text-amber-600 mt-0.5 shrink-0"></i>
+        <div>
+          <b>ค้น → Join → Scan</b> ครบในที่เดียว: ค้นหากลุ่มที่ตรงคำที่ใส่ → กด <b>"Join + Add"</b> เพื่อให้ระบบขอเข้ากลุ่มและเพิ่มเข้า scan list ให้อัตโนมัติ
+          <div class="text-xs mt-1 opacity-80">ถ้ากลุ่มมีคำถามคัดกรอง Chromium จะเปิดให้คุณตอบเองในหน้าต่างนั้น (รอ 5 นาที) — หลังตอบเสร็จระบบจะปิดให้</div>
+        </div>
+      </div>
       <div class="flex gap-2 mb-4">
         <div class="relative flex-1">
           <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -470,7 +477,6 @@ function groupCard(g, opts) {
   });
 
   const top = el('div', { class:'flex items-start gap-2 mb-2' });
-  // checkbox indicator (visual only)
   if (alreadyIn) {
     const ok = el('div', { class:'text-emerald-600 mt-0.5' });
     ok.appendChild(icon('check-square'));
@@ -486,18 +492,46 @@ function groupCard(g, opts) {
   ));
   card.appendChild(top);
 
-  const row = el('div', { class:'flex gap-2 mt-2' });
+  const row = el('div', { class:'flex gap-2 mt-2 flex-wrap' });
   row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost', onclick: (e) => e.stopPropagation() },
     icon('external-link'), 'เปิด'));
-  row.appendChild(el('button', {
-    class: 'btn ' + (alreadyIn ? 'btn-ghost' : 'btn-success'),
-    onclick: async (e) => {
-      e.stopPropagation();
-      if (alreadyIn) return;
-      await addGroup(g.url, g.name);
-      renderAll(); lucide.createIcons();
+
+  if (alreadyIn) {
+    row.appendChild(el('button', { class:'btn btn-ghost', disabled: '' }, icon('check'), 'อยู่ใน list'));
+  } else {
+    // For search results: prefer Join + Add (you're not a member yet)
+    // For mygroups: just Add (you're already a member)
+    if (kind === 'search') {
+      row.appendChild(el('button', {
+        class: 'btn btn-success',
+        onclick: async (e) => {
+          e.stopPropagation();
+          if (!confirm(`ขอเข้ากลุ่ม "${g.name}" และเพิ่มเข้า Scan List?\n\nระบบจะเปิด Chromium ทำให้ — ถ้ามีคำถามคัดกรอง คุณต้องตอบเองในหน้าต่างนั้น (รอ 5 นาที)`)) return;
+          // remember so SSE done-handler can add it to scan list
+          window.__pendingJoin = { url: g.url, name: g.name };
+          runJob('join', g.url, 'Join: ' + g.name);
+        }
+      }, icon('log-in'), 'Join + Add'));
+      row.appendChild(el('button', {
+        class: 'btn btn-ghost',
+        onclick: async (e) => {
+          e.stopPropagation();
+          await addGroup(g.url, g.name);
+          renderAll(); lucide.createIcons();
+        }
+      }, icon('plus'), 'แค่เพิ่ม (ไม่ join)'));
+    } else {
+      row.appendChild(el('button', {
+        class: 'btn btn-success',
+        onclick: async (e) => {
+          e.stopPropagation();
+          await addGroup(g.url, g.name);
+          renderAll(); lucide.createIcons();
+        }
+      }, icon('plus'), 'เพิ่มเข้า Scan List'));
     }
-  }, icon(alreadyIn ? 'check' : 'plus'), alreadyIn ? 'อยู่ใน list' : 'เพิ่มทันที'));
+  }
+
   card.appendChild(row);
   return card;
 }
@@ -816,7 +850,18 @@ function runJob(command, arg, label) {
         appendConsole('✓ exited code ' + msg.payload.code, msg.payload.code === 0 ? 'text-green-300' : 'text-red-400');
         es.close(); activeES = null;
         $('#job-indicator').textContent = '';
-        refresh();
+        // If a join just finished successfully, add the group to scan list
+        if (msg.payload.code === 0 && window.__pendingJoin) {
+          const pj = window.__pendingJoin;
+          window.__pendingJoin = null;
+          addGroup(pj.url, pj.name).then(added => {
+            if (added) appendConsole('+ เพิ่ม "' + pj.name + '" เข้า Scan List แล้ว', 'text-green-300');
+            refresh();
+          });
+        } else {
+          if (msg.payload.code !== 0) window.__pendingJoin = null;
+          refresh();
+        }
       }
     } catch {}
   };
