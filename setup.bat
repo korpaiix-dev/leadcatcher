@@ -20,23 +20,16 @@ if exist .git_seed (
   )
 )
 
+REM Clean up stray .lock and .bak files that the sandbox could not delete
+if exist .git\config.lock     del /q .git\config.lock
+if exist .git\config.lock.bak del /q .git\config.lock.bak
+if exist .git\index.lock      del /q .git\index.lock
+if exist .git\index.lock.bak  del /q .git\index.lock.bak
+
 REM If no git repo at all, init a fresh one
 git rev-parse --git-dir >nul 2>&1
 if errorlevel 1 (
   echo Initializing fresh git repo...
   git init -b main
   git config user.email "korpaiix@gmail.com"
-  git config user.name "korpaiix"
-  git add .
-  git commit -m "Initial commit: Phase 0 spike scaffolding"
-)
-
-REM Reset working tree to match the recorded snapshot
-git checkout . >nul 2>&1
-
-echo.
-echo Git is ready. Next:
-echo   npm install
-echo   npx playwright install chromium
-echo   copy config.example.json config.json
-echo.
+  git config user.name "korpaii

@@ -15,6 +15,9 @@ if [ -d .git_seed ] && [ ! -d .git ]; then
   echo "Restored .git from seed."
 fi
 
+# Clean up stray lock and bak files
+rm -f .git/config.lock .git/config.lock.bak .git/index.lock .git/index.lock.bak 2>/dev/null || true
+
 # Fresh init if nothing is there
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "Initializing fresh git repo..."
@@ -28,8 +31,4 @@ fi
 git checkout . >/dev/null 2>&1 || true
 
 echo
-echo "Git is ready. Next:"
-echo "  npm install"
-echo "  npx playwright install chromium"
-echo "  cp config.example.json config.json"
-echo
+e
