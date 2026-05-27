@@ -3,216 +3,350 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LeadCatcher Dashboard</title>
+  <title>LeadCatcher</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: -apple-system, "Segoe UI", "Sukhumvit Set", sans-serif; }
-    .status-new       { background:#eff6ff; color:#1e40af; }
-    .status-contacted { background:#fef3c7; color:#92400e; }
-    .status-won       { background:#dcfce7; color:#166534; }
-    .status-lost      { background:#f3f4f6; color:#6b7280; }
-    .console-line { white-space: pre-wrap; }
-    .step-badge { width: 28px; height: 28px; }
-    body.console-open { padding-right: 420px; }
-    body.console-open header { padding-right: 420px; }
-    #console { display: none; }
-    #console.open { display: flex; }
-    @media (max-width: 1024px) {
-      body.console-open { padding-right: 0; }
-      body.console-open header { padding-right: 0; }
-      #console { width: 100% !important; max-width: 420px; }
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'IBM Plex Sans Thai', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
     }
+  </script>
+  <style>
+    body { background:#fafafa; font-family: 'Inter','IBM Plex Sans Thai',system-ui,sans-serif; }
+    .card { background:white; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,0.03); }
+    .nav-link { color:#64748b; padding:8px 14px; border-radius:8px; font-weight:500; font-size:14px;
+                display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+    .nav-link:hover { background:#f1f5f9; color:#0f172a; }
+    .nav-link.active { background:#0f172a; color:#fff; }
+    .nav-link.active:hover { background:#1e293b; color:#fff; }
+    .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px;
+           font-size:14px; font-weight:500; cursor:pointer; transition:all 150ms;
+           border:1px solid transparent; }
+    .btn-primary  { background:#0f172a; color:#fff; }
+    .btn-primary:hover  { background:#1e293b; }
+    .btn-primary:disabled { background:#cbd5e1; cursor:not-allowed; }
+    .btn-success  { background:#059669; color:#fff; }
+    .btn-success:hover  { background:#047857; }
+    .btn-success:disabled { background:#cbd5e1; cursor:not-allowed; }
+    .btn-ghost { background:transparent; color:#334155; border-color:#e2e8f0; }
+    .btn-ghost:hover { background:#f8fafc; border-color:#cbd5e1; }
+    .btn-danger { color:#dc2626; background:transparent; }
+    .btn-danger:hover { background:#fef2f2; }
+    .input { width:100%; padding:9px 12px; border-radius:8px; border:1px solid #e2e8f0;
+             font-size:14px; background:white; outline:none; }
+    .input:focus { border-color:#0f172a; box-shadow:0 0 0 3px rgba(15,23,42,0.05); }
+    .chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px;
+            background:#eef2ff; color:#3730a3; font-size:13px; font-weight:500; }
+    .chip-close { color:#6366f1; cursor:pointer; display:inline-flex; }
+    .chip-close:hover { color:#dc2626; }
+    .status-pill { display:inline-flex; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+    .status-new       { background:#dbeafe; color:#1e40af; }
+    .status-contacted { background:#fef3c7; color:#92400e; }
+    .status-won       { background:#d1fae5; color:#065f46; }
+    .status-lost      { background:#f1f5f9; color:#64748b; }
+    .empty-state { text-align:center; padding:60px 20px; color:#94a3b8; }
+    .empty-state .icon { width:48px; height:48px; margin:0 auto 12px; color:#cbd5e1; }
+    .console-line { white-space:pre-wrap; }
+    body.console-open { padding-right:420px; }
+    body.console-open .topbar { padding-right:calc(24px + 420px); }
+    #console { display:none; }
+    #console.open { display:flex; }
+    @media (max-width: 1024px) {
+      body.console-open { padding-right:0; }
+      body.console-open .topbar { padding-right:24px; }
+    }
+    [data-lucide] { width:18px; height:18px; stroke-width:2; }
+    .icon-sm [data-lucide] { width:14px; height:14px; }
+    .icon-lg [data-lucide] { width:22px; height:22px; }
+    .scrollable-grid { max-height: 480px; overflow-y: auto; padding-right: 4px; }
   </style>
 </head>
-<body class="bg-stone-50 text-stone-900 min-h-screen pb-24">
+<body class="text-slate-800">
 
-<!-- Header -->
-<header class="border-b border-stone-200 bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-  <div>
-    <h1 class="text-lg font-semibold">LeadCatcher</h1>
-    <p class="text-xs text-stone-500">Local dashboard — เปิดในเบราว์เซอร์ ทำงานบนเครื่องคุณ</p>
-  </div>
-  <div class="flex items-center gap-3">
-    <div id="job-indicator" class="text-sm text-stone-500"></div>
-    <button id="console-toggle" class="px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-100 text-sm flex items-center gap-1.5" title="Toggle output log">
-      <span>📜</span><span>Log</span>
-    </button>
+<!-- ===================================================================
+     TOP BAR
+====================================================================== -->
+<header class="topbar sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-6">
+  <div class="flex items-center h-14 gap-6">
+    <!-- Brand -->
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center icon-lg">
+        <i data-lucide="target"></i>
+      </div>
+      <span class="font-semibold text-slate-900">LeadCatcher</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex items-center gap-1 flex-1">
+      <span class="nav-link active" data-nav="overview"><i data-lucide="layout-dashboard"></i>Overview</span>
+      <span class="nav-link" data-nav="groups"><i data-lucide="users"></i>Groups <span id="nav-group-count" class="text-xs opacity-70"></span></span>
+      <span class="nav-link" data-nav="keywords"><i data-lucide="tags"></i>Keywords <span id="nav-kw-count" class="text-xs opacity-70"></span></span>
+      <span class="nav-link" data-nav="posts"><i data-lucide="inbox"></i>Lead Posts <span id="nav-post-count" class="text-xs opacity-70"></span></span>
+    </nav>
+
+    <!-- Right side -->
+    <div class="flex items-center gap-3 shrink-0">
+      <span id="job-indicator" class="text-xs text-slate-500"></span>
+      <button id="console-toggle" class="btn btn-ghost" title="Toggle output log">
+        <i data-lucide="terminal"></i>
+        <span>Log</span>
+      </button>
+    </div>
   </div>
 </header>
 
-<main class="max-w-[1400px] mx-auto p-6 space-y-6">
+<!-- ===================================================================
+     MAIN CONTENT
+====================================================================== -->
+<main class="max-w-6xl mx-auto px-6 py-8">
 
-  <!-- ======== STEP 1: LOGIN ======== -->
-  <section class="bg-white rounded-lg border border-stone-200 p-5">
-    <div class="flex items-start gap-3 mb-3">
-      <div class="step-badge rounded-full bg-stone-900 text-white text-sm font-bold flex items-center justify-center shrink-0">1</div>
-      <div class="flex-1">
-        <h2 class="font-semibold">Login Facebook</h2>
-        <p class="text-sm text-stone-500">ทำครั้งเดียว ระบบจะจำ session ไว้ — ใช้ <b>account สำรอง</b> ดีกว่า account หลัก</p>
-      </div>
-      <button id="btn-login" class="px-4 py-2 rounded bg-stone-900 text-white hover:bg-stone-700 text-sm">
-        Login Facebook
-      </button>
-    </div>
-  </section>
+<!-- ============== OVERVIEW PAGE ============== -->
+<section data-section="overview" class="space-y-6">
 
-  <!-- ======== STEP 2: PICK GROUPS ======== -->
-  <section class="bg-white rounded-lg border border-stone-200 p-5">
-    <div class="flex items-start gap-3 mb-4">
-      <div class="step-badge rounded-full bg-stone-900 text-white text-sm font-bold flex items-center justify-center shrink-0">2</div>
-      <div class="flex-1">
-        <h2 class="font-semibold">เลือกกลุ่มที่จะ scan</h2>
-        <p class="text-sm text-stone-500">เลือกได้ 3 ทาง — กลุ่มที่เลือกจะอยู่ใน "Scan List" ด้านล่าง</p>
+  <!-- Stat tiles -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="card p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Lead Posts</div>
+      <div class="flex items-baseline gap-2">
+        <div id="stat-total" class="text-2xl font-bold text-slate-900">0</div>
+        <span class="text-xs text-slate-400">ทั้งหมด</span>
       </div>
     </div>
-
-    <!-- Tabs -->
-    <div class="border-b border-stone-200 flex gap-1 text-sm">
-      <button data-grouptab="joined"  class="grouptab-btn px-3 py-2 border-b-2 border-stone-900 font-medium">กลุ่มที่ฉันเข้าอยู่</button>
-      <button data-grouptab="search"  class="grouptab-btn px-3 py-2 border-b-2 border-transparent text-stone-500 hover:text-stone-900">ค้นหากลุ่มใหม่</button>
-      <button data-grouptab="manual"  class="grouptab-btn px-3 py-2 border-b-2 border-transparent text-stone-500 hover:text-stone-900">วาง URL เอง</button>
+    <div class="card p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">ใหม่</div>
+      <div id="stat-new" class="text-2xl font-bold text-blue-600">0</div>
     </div>
+    <div class="card p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">ติดต่อแล้ว</div>
+      <div id="stat-contacted" class="text-2xl font-bold text-amber-600">0</div>
+    </div>
+    <div class="card p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">ปิดดีล</div>
+      <div id="stat-won" class="text-2xl font-bold text-emerald-600">0</div>
+    </div>
+  </div>
 
-    <!-- Tab content: joined -->
-    <div id="gtab-joined" class="pt-4">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-sm text-stone-600">โหลดรายชื่อกลุ่มที่ FB account ของคุณเป็นสมาชิกอยู่</p>
-        <button id="btn-mygroups" class="px-3 py-1.5 text-sm rounded bg-stone-200 hover:bg-stone-300">
-          โหลดกลุ่มของฉัน
-        </button>
+  <!-- Setup checklist + quick actions -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <div class="card p-6">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h2 class="font-semibold text-slate-900 flex items-center gap-2">
+            <i data-lucide="check-circle-2" class="text-emerald-600"></i> Setup Checklist
+          </h2>
+          <p class="text-sm text-slate-500 mt-1">ทำให้ครบก่อน scan</p>
+        </div>
       </div>
-      <div id="mygroups-meta" class="text-xs text-stone-400 mb-2"></div>
-      <div id="mygroups" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+      <ul class="space-y-2 text-sm">
+        <li id="check-login" class="flex items-center gap-3">
+          <i data-lucide="circle" class="text-slate-300"></i>
+          <span>Login Facebook</span>
+        </li>
+        <li id="check-groups" class="flex items-center gap-3">
+          <i data-lucide="circle" class="text-slate-300"></i>
+          <span>เลือกกลุ่มอย่างน้อย 1 กลุ่ม</span>
+        </li>
+        <li id="check-keywords" class="flex items-center gap-3">
+          <i data-lucide="circle" class="text-slate-300"></i>
+          <span>เพิ่ม Keyword อย่างน้อย 1 คำ</span>
+        </li>
+        <li id="check-scan" class="flex items-center gap-3">
+          <i data-lucide="circle" class="text-slate-300"></i>
+          <span>Scan แล้วอย่างน้อย 1 ครั้ง</span>
+        </li>
+      </ul>
     </div>
 
-    <!-- Tab content: search -->
-    <div id="gtab-search" class="pt-4 hidden">
-      <div class="flex gap-2 mb-3">
-        <input id="search-q" placeholder="ค้น เช่น งานแต่งงาน, prewedding"
-               class="flex-1 px-3 py-2 rounded border border-stone-300" />
-        <button id="btn-search" class="px-4 py-2 rounded bg-stone-200 hover:bg-stone-300 text-sm">
-          ค้นหา
-        </button>
+    <div class="card p-6">
+      <h2 class="font-semibold text-slate-900 flex items-center gap-2 mb-4">
+        <i data-lucide="zap" class="text-amber-500"></i> Quick Actions
+      </h2>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-login" class="btn btn-primary justify-center"><i data-lucide="log-in"></i>Login</button>
+        <button id="btn-mygroups" class="btn btn-ghost justify-center"><i data-lucide="users"></i>โหลดกลุ่มของฉัน</button>
+        <button id="btn-overview-search" class="btn btn-ghost justify-center"><i data-lucide="search"></i>ค้นกลุ่ม</button>
+        <button id="btn-scan" class="btn btn-success justify-center" disabled><i data-lucide="play"></i>Scan Groups</button>
+      </div>
+      <p id="scan-summary" class="text-xs text-slate-500 mt-3 text-center">รอตั้งค่าก่อน scan</p>
+    </div>
+  </div>
+
+  <!-- Recent leads preview -->
+  <div class="card">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h2 class="font-semibold text-slate-900 flex items-center gap-2">
+        <i data-lucide="inbox"></i> Recent Leads
+      </h2>
+      <span class="nav-link" data-nav="posts" style="font-size:12px;">ดูทั้งหมด <i data-lucide="arrow-right" class="icon-sm"></i></span>
+    </div>
+    <div id="recent-posts" class="divide-y divide-slate-100"></div>
+  </div>
+</section>
+
+<!-- ============== GROUPS PAGE ============== -->
+<section data-section="groups" class="space-y-6 hidden">
+  <div>
+    <h1 class="text-xl font-bold text-slate-900">Groups</h1>
+    <p class="text-sm text-slate-500 mt-1">เลือกกลุ่มที่จะ scan — ใช้ 3 ทาง: โหลดกลุ่มที่เข้าอยู่, ค้นหาใหม่, วาง URL เอง</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="card">
+    <div class="border-b border-slate-200 px-4 flex gap-1">
+      <button data-grouptab="joined" class="grouptab nav-link active" style="border-radius:0; padding:14px 16px;"><i data-lucide="user-check"></i>กลุ่มที่ฉันเข้าอยู่</button>
+      <button data-grouptab="search" class="grouptab nav-link" style="border-radius:0; padding:14px 16px;"><i data-lucide="search"></i>ค้นหากลุ่มใหม่</button>
+      <button data-grouptab="manual" class="grouptab nav-link" style="border-radius:0; padding:14px 16px;"><i data-lucide="link"></i>วาง URL เอง</button>
+    </div>
+
+    <!-- Joined groups tab -->
+    <div id="gtab-joined" class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-sm text-slate-700">โหลดรายชื่อกลุ่มที่ FB account ของคุณเข้าอยู่</p>
+          <p id="mygroups-meta" class="text-xs text-slate-400 mt-1">ยังไม่ได้โหลด</p>
+        </div>
+        <button id="btn-mygroups-2" class="btn btn-ghost"><i data-lucide="refresh-cw"></i>โหลดกลุ่มของฉัน</button>
+      </div>
+      <div id="mygroups" class="scrollable-grid grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+
+    <!-- Search tab -->
+    <div id="gtab-search" class="p-6 hidden">
+      <div class="flex gap-2 mb-4">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="search-q" class="input pl-9" placeholder='ค้น เช่น "งานแต่งงาน", "หาช่างภาพ"' />
+        </div>
+        <button id="btn-search" class="btn btn-primary"><i data-lucide="search"></i>ค้นหา</button>
       </div>
       <div id="search-results"></div>
     </div>
 
-    <!-- Tab content: manual -->
-    <div id="gtab-manual" class="pt-4 hidden">
-      <div class="flex gap-2 mb-3">
-        <input id="manual-url" placeholder="https://www.facebook.com/groups/123456789"
-               class="flex-1 px-3 py-2 rounded border border-stone-300" />
-        <input id="manual-name" placeholder="ชื่อ (เลือกใส่)"
-               class="w-48 px-3 py-2 rounded border border-stone-300" />
-        <button id="btn-manual-add" class="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 text-sm">
-          + เพิ่มเข้า Scan List
-        </button>
+    <!-- Manual tab -->
+    <div id="gtab-manual" class="p-6 hidden">
+      <p class="text-sm text-slate-700 mb-3">วาง URL ของกลุ่ม Facebook ที่คุณอยากเพิ่มเข้า Scan List</p>
+      <div class="flex gap-2">
+        <input id="manual-url" class="input flex-1" placeholder="https://www.facebook.com/groups/123456789" />
+        <input id="manual-name" class="input" style="max-width:200px;" placeholder="ชื่อ (เลือก)" />
+        <button id="btn-manual-add" class="btn btn-success"><i data-lucide="plus"></i>เพิ่ม</button>
       </div>
     </div>
+  </div>
 
-    <!-- Scan list (always visible) -->
-    <div class="mt-6 border-t border-stone-200 pt-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-semibold">📋 Scan List <span id="scan-list-count" class="text-stone-400 font-normal"></span></h3>
-        <button id="btn-clear-list" class="text-xs text-red-600 hover:text-red-800">ล้างทั้งหมด</button>
-      </div>
-      <div id="scan-list" class="space-y-1"></div>
+  <!-- Scan list -->
+  <div class="card">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h2 class="font-semibold text-slate-900 flex items-center gap-2">
+        <i data-lucide="clipboard-list"></i> Scan List
+        <span id="scan-list-count" class="text-sm text-slate-400 font-normal"></span>
+      </h2>
+      <button id="btn-clear-list" class="btn btn-danger"><i data-lucide="trash-2"></i>ล้างทั้งหมด</button>
     </div>
-  </section>
+    <div id="scan-list" class="divide-y divide-slate-100"></div>
+  </div>
+</section>
 
-  <!-- ======== STEP 3: KEYWORDS ======== -->
-  <section class="bg-white rounded-lg border border-stone-200 p-5">
-    <div class="flex items-start gap-3 mb-3">
-      <div class="step-badge rounded-full bg-stone-900 text-white text-sm font-bold flex items-center justify-center shrink-0">3</div>
-      <div class="flex-1">
-        <h2 class="font-semibold">Keywords ที่จะหาในโพสต์</h2>
-        <p class="text-sm text-stone-500">โพสต์ที่มีคำเหล่านี้ (อันใดอันหนึ่ง) จะถูกเก็บเป็น lead — กด <kbd class="px-1 rounded bg-stone-100 text-xs">Enter</kbd> เพื่อเพิ่ม</p>
-      </div>
-    </div>
+<!-- ============== KEYWORDS PAGE ============== -->
+<section data-section="keywords" class="space-y-6 hidden">
+  <div>
+    <h1 class="text-xl font-bold text-slate-900">Keywords</h1>
+    <p class="text-sm text-slate-500 mt-1">โพสต์ที่มีคำเหล่านี้ (อันใดอันหนึ่ง) จะถูกเก็บเป็น lead</p>
+  </div>
 
-    <div id="keyword-chips" class="flex flex-wrap gap-2 mb-3"></div>
-
+  <div class="card p-6">
+    <div id="keyword-chips" class="flex flex-wrap gap-2 mb-4 min-h-[40px]"></div>
     <div class="flex gap-2">
-      <input id="keyword-input" placeholder="เพิ่ม keyword ใหม่..."
-             class="flex-1 px-3 py-2 rounded border border-stone-300" />
-      <button id="btn-add-keyword" class="px-4 py-2 rounded bg-stone-200 hover:bg-stone-300 text-sm">+ เพิ่ม</button>
+      <input id="keyword-input" class="input flex-1" placeholder="เพิ่ม keyword ใหม่ แล้วกด Enter" />
+      <button id="btn-add-keyword" class="btn btn-primary"><i data-lucide="plus"></i>เพิ่ม</button>
     </div>
-  </section>
+    <p class="text-xs text-slate-400 mt-3">เคล็ดลับ: ใส่คำเฉพาะ เช่น "หาช่างภาพ" ตรงกว่า "ช่าง" — keyword จับ substring (case-insensitive)</p>
+  </div>
+</section>
 
-  <!-- ======== STEP 4: SCAN ======== -->
-  <section class="bg-white rounded-lg border border-stone-200 p-5">
-    <div class="flex items-start gap-3 mb-3">
-      <div class="step-badge rounded-full bg-stone-900 text-white text-sm font-bold flex items-center justify-center shrink-0">4</div>
-      <div class="flex-1">
-        <h2 class="font-semibold">เริ่ม Scan</h2>
-        <p id="scan-summary" class="text-sm text-stone-500">รอตั้งค่ากลุ่ม + keyword ก่อน</p>
-      </div>
-      <button id="btn-scan" class="px-5 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 font-medium">
-        ▶ Scan Groups
-      </button>
+<!-- ============== POSTS PAGE ============== -->
+<section data-section="posts" class="space-y-6 hidden">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900">Lead Posts</h1>
+      <p id="posts-meta" class="text-sm text-slate-500 mt-1">ยังไม่มีผลลัพธ์ — Scan ก่อน</p>
     </div>
-  </section>
-
-  <!-- ======== RESULTS ======== -->
-  <section class="bg-white rounded-lg border border-stone-200">
-    <div class="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
-      <div>
-        <h2 class="font-semibold">📬 Lead Posts</h2>
-        <div id="stats" class="text-xs text-stone-500 mt-0.5">Loading…</div>
-      </div>
-      <div class="flex items-center gap-2 text-sm">
-        <select id="filter-status" class="px-3 py-1.5 rounded border border-stone-300">
-          <option value="">ทุกสถานะ</option>
-          <option value="new">ใหม่</option>
-          <option value="contacted">ติดต่อแล้ว</option>
-          <option value="won">ปิดดีล</option>
-          <option value="lost">ไม่สนใจ</option>
-        </select>
-        <input id="filter-q" placeholder="ค้นในข้อความ…" class="px-3 py-1.5 rounded border border-stone-300 w-48" />
+    <div class="flex gap-2">
+      <select id="filter-status" class="input" style="width:auto;">
+        <option value="">ทุกสถานะ</option>
+        <option value="new">ใหม่</option>
+        <option value="contacted">ติดต่อแล้ว</option>
+        <option value="won">ปิดดีล</option>
+        <option value="lost">ไม่สนใจ</option>
+      </select>
+      <div class="relative">
+        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input id="filter-q" class="input pl-9" placeholder="ค้นในข้อความ…" />
       </div>
     </div>
-    <div id="posts" class="p-4 space-y-2"></div>
-  </section>
+  </div>
+  <div id="posts" class="space-y-3"></div>
+</section>
 
 </main>
 
-<!-- Output console (right sidebar, toggleable) -->
-<aside id="console" class="fixed top-0 right-0 bottom-0 w-[420px] bg-stone-900 text-stone-100 shadow-2xl z-20 flex-col hidden">
-  <div class="flex items-center justify-between px-4 py-2.5 border-b border-stone-700 shrink-0">
+<!-- ===================================================================
+     OUTPUT CONSOLE (right drawer)
+====================================================================== -->
+<aside id="console" class="fixed top-0 right-0 bottom-0 w-[420px] bg-slate-950 text-slate-100 shadow-2xl z-20 flex-col">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
     <div class="flex items-center gap-2 min-w-0">
-      <span class="font-mono text-xs">Output</span>
-      <span id="console-title" class="text-xs text-stone-400 truncate"></span>
+      <i data-lucide="terminal" class="text-slate-400"></i>
+      <span class="font-mono text-xs uppercase tracking-wide text-slate-400">Output</span>
+      <span id="console-title" class="text-xs text-slate-500 truncate"></span>
     </div>
-    <div class="flex items-center gap-3 shrink-0">
-      <button id="console-clear" class="text-xs text-stone-400 hover:text-white">clear</button>
-      <button id="console-close" class="text-stone-400 hover:text-white text-lg leading-none">×</button>
+    <div class="flex items-center gap-2 shrink-0">
+      <button id="console-clear" class="text-xs text-slate-400 hover:text-white">clear</button>
+      <button id="console-close" class="text-slate-400 hover:text-white text-xl leading-none">×</button>
     </div>
   </div>
-  <pre id="console-out" class="overflow-y-auto p-3 text-xs font-mono flex-1 m-0"></pre>
+  <pre id="console-out" class="overflow-y-auto p-4 text-xs font-mono flex-1 m-0 leading-relaxed"></pre>
 </aside>
 
 <script>
 const $ = (s) => document.querySelector(s);
-const el = (tag, props={}, ...children) => {
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+function el(tag, props={}, ...children) {
   const e = document.createElement(tag);
   for (const [k,v] of Object.entries(props)) {
     if (k === 'class') e.className = v;
     else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
     else if (k === 'html') e.innerHTML = v;
-    else e.setAttribute(k, v);
+    else if (v !== undefined && v !== null) e.setAttribute(k, v);
   }
   for (const c of children) {
     if (c == null) continue;
     e.append(c.nodeType ? c : document.createTextNode(c));
   }
   return e;
-};
+}
+
+function icon(name, className='') {
+  const i = document.createElement('i');
+  i.setAttribute('data-lucide', name);
+  if (className) i.className = className;
+  return i;
+}
 
 let config = null;
-let data = { posts: [], searches: [], myGroups: [], scanFiles: 0 };
+let data = { posts: [], searches: [], myGroups: [], myGroupsAt: 0, scanFiles: 0 };
 let filterStatus = '';
 let filterQ = '';
-let activeGroupTab = 'joined';
 
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -223,189 +357,210 @@ async function api(path, opts) {
 async function refresh() {
   try {
     [config, data] = await Promise.all([api('/api/config'), api('/api/results')]);
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) { console.error(e); }
+  renderAll();
+  lucide.createIcons();
+}
+
+function renderAll() {
+  // top-bar counts
+  $('#nav-group-count').textContent = config?.groups?.length ? `(${config.groups.length})` : '';
+  $('#nav-kw-count').textContent    = config?.keywords?.length ? `(${config.keywords.length})` : '';
+  $('#nav-post-count').textContent  = data.posts.length ? `(${data.posts.length})` : '';
+
+  renderStats();
+  renderChecklist();
   renderKeywords();
   renderScanList();
   renderMyGroups();
   renderSearches();
-  renderStats();
   renderPosts();
+  renderRecent();
   renderScanSummary();
 }
 
-async function saveConfig() {
-  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(config) });
+function renderStats() {
+  $('#stat-total').textContent     = data.posts.length;
+  $('#stat-new').textContent       = data.posts.filter(p => p.status === 'new').length;
+  $('#stat-contacted').textContent = data.posts.filter(p => p.status === 'contacted').length;
+  $('#stat-won').textContent       = data.posts.filter(p => p.status === 'won').length;
 }
 
-//
-// ---------- Keywords ----------
-//
+function checkItem(id, done) {
+  const li = $(id);
+  if (!li) return;
+  const i = li.querySelector('i');
+  if (done) {
+    i.setAttribute('data-lucide', 'check-circle-2');
+    i.classList.remove('text-slate-300');
+    i.classList.add('text-emerald-600');
+    li.querySelector('span').classList.add('text-slate-900');
+  } else {
+    i.setAttribute('data-lucide', 'circle');
+    i.classList.add('text-slate-300');
+    i.classList.remove('text-emerald-600');
+    li.querySelector('span').classList.remove('text-slate-900');
+  }
+}
+
+function renderChecklist() {
+  // login: hard to detect from here, but if mygroups has results OR sessions exist, assume yes.
+  const hasMyGroups = data.myGroups && data.myGroups.length > 0;
+  checkItem('#check-login',    hasMyGroups || data.scanFiles > 0 || data.searches.length > 0);
+  checkItem('#check-groups',   (config?.groups?.length || 0) > 0);
+  checkItem('#check-keywords', (config?.keywords?.length || 0) > 0);
+  checkItem('#check-scan',     data.scanFiles > 0);
+}
+
 function renderKeywords() {
   const wrap = $('#keyword-chips');
   wrap.innerHTML = '';
   const keys = (config?.keywords) || [];
   if (keys.length === 0) {
-    wrap.appendChild(el('span', { class:'text-sm text-stone-400' }, 'ยังไม่มี keyword — เพิ่มข้างล่าง'));
+    wrap.appendChild(el('span', { class:'text-sm text-slate-400' }, 'ยังไม่มี keyword'));
     return;
   }
   for (const k of keys) {
-    const chip = el('span', { class:'inline-flex items-center gap-1 px-2 py-1 rounded bg-yellow-100 text-yellow-900 text-sm' }, k);
-    chip.appendChild(el('button', {
-      class:'text-yellow-700 hover:text-red-600 ml-1',
-      onclick: () => { config.keywords = config.keywords.filter(x => x !== k); saveConfig(); renderKeywords(); renderScanSummary(); }
-    }, '×'));
+    const chip = el('span', { class:'chip' }, k);
+    const close = el('span', {
+      class:'chip-close',
+      onclick: () => { config.keywords = config.keywords.filter(x => x !== k); saveConfig(); renderAll(); lucide.createIcons(); }
+    });
+    close.appendChild(icon('x'));
+    chip.appendChild(close);
     wrap.appendChild(chip);
   }
 }
 
-async function addKeyword() {
-  const input = $('#keyword-input');
-  const v = input.value.trim();
-  if (!v) return;
-  config.keywords = config.keywords || [];
-  if (!config.keywords.includes(v)) {
-    config.keywords.push(v);
-    await saveConfig();
-  }
-  input.value = '';
-  renderKeywords();
-  renderScanSummary();
-}
-
-//
-// ---------- Scan list ----------
-//
 function renderScanList() {
   const wrap = $('#scan-list');
   wrap.innerHTML = '';
   const groups = config?.groups || [];
-  $('#scan-list-count').textContent = `(${groups.length} กลุ่ม)`;
+  $('#scan-list-count').textContent = `${groups.length} กลุ่ม`;
   if (groups.length === 0) {
-    wrap.appendChild(el('div', { class:'text-sm text-stone-400 py-3 text-center' },
-      'ยังไม่มีกลุ่มใน scan list — เลือกจาก tab ด้านบน'));
+    const empty = el('div', { class:'empty-state' });
+    const ic = el('div', { class:'icon icon-lg' });
+    ic.appendChild(icon('list'));
+    empty.appendChild(ic);
+    empty.appendChild(el('div', {}, 'ยังไม่มีกลุ่มใน scan list — เลือกจาก tab ด้านบน'));
+    wrap.appendChild(empty);
     return;
   }
   for (const g of groups) {
-    const row = el('div', { class:'flex items-center gap-2 text-sm py-1.5 px-2 rounded hover:bg-stone-50' });
-    row.appendChild(el('span', { class:'flex-1 truncate', title: g.url }, '• ' + (g.name || g.url)));
-    row.appendChild(el('a', { href: g.url, target:'_blank', class:'text-xs text-stone-500 hover:text-stone-900' }, 'เปิด'));
+    const row = el('div', { class:'px-6 py-3 flex items-center gap-3 hover:bg-slate-50' });
+    const i = el('div', { class:'text-slate-400' });
+    i.appendChild(icon('users'));
+    row.appendChild(i);
+    row.appendChild(el('div', { class:'flex-1 min-w-0' },
+      el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.url }, g.name || g.url),
+      el('div', { class:'text-xs text-slate-400 truncate' }, g.url)
+    ));
+    row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost' },
+      (() => { const i = icon('external-link'); return i; })(), 'เปิด'));
     row.appendChild(el('button', {
-      class:'text-xs text-red-600 hover:text-red-800',
-      onclick: () => { config.groups = config.groups.filter(x => x.url !== g.url); saveConfig(); renderScanList(); renderScanSummary(); }
-    }, 'เอาออก'));
+      class:'btn btn-danger',
+      onclick: () => { config.groups = config.groups.filter(x => x.url !== g.url); saveConfig(); renderAll(); lucide.createIcons(); }
+    }, (() => { const i = icon('x'); return i; })(), 'เอาออก'));
     wrap.appendChild(row);
   }
 }
 
-async function addGroup(url, name) {
-  if (!config) return false;
-  if (!url || url.includes('REPLACE_WITH_GROUP_ID')) {
-    alert('URL ไม่ถูกต้อง'); return false;
-  }
-  config.groups = config.groups || [];
-  if (config.groups.some(g => g.url === url)) {
-    return false; // already there
-  }
-  config.groups.push({ url, name: name || url });
-  await saveConfig();
-  renderScanList();
-  renderScanSummary();
-  return true;
-}
-
-async function clearList() {
-  if (!confirm('ลบกลุ่มทั้งหมดออกจาก scan list?')) return;
-  config.groups = [];
-  await saveConfig();
-  renderScanList();
-  renderScanSummary();
-}
-
-//
-// ---------- My joined groups ----------
-//
 function renderMyGroups() {
   const wrap = $('#mygroups');
   wrap.innerHTML = '';
   const inList = new Set((config?.groups || []).map(g => g.url));
 
-  $('#mygroups-meta').textContent = data.myGroupsAt
-    ? `อัปเดตล่าสุด: ${new Date(data.myGroupsAt).toLocaleString('th-TH', { hour12:false })} — ${data.myGroups.length} กลุ่ม`
-    : 'ยังไม่ได้โหลด — กด "โหลดกลุ่มของฉัน"';
+  if (data.myGroupsAt) {
+    $('#mygroups-meta').textContent =
+      `อัปเดต: ${new Date(data.myGroupsAt).toLocaleString('th-TH', { hour12:false })} — เจอ ${data.myGroups.length} กลุ่ม`;
+  } else {
+    $('#mygroups-meta').textContent = 'ยังไม่ได้โหลด — กด "โหลดกลุ่มของฉัน" (ต้อง login ก่อน)';
+  }
 
   if (data.myGroups.length === 0) {
-    wrap.appendChild(el('div', { class:'col-span-2 text-sm text-stone-400 text-center py-6' },
-      'ไม่มีข้อมูล — กดปุ่ม "โหลดกลุ่มของฉัน" ด้านบน (login ก่อน)'));
+    const empty = el('div', { class:'empty-state col-span-full' });
+    const ic = el('div', { class:'icon icon-lg' });
+    ic.appendChild(icon('users-2'));
+    empty.appendChild(ic);
+    empty.appendChild(el('div', {}, 'ยังไม่มีข้อมูลกลุ่ม — กดปุ่ม "โหลดกลุ่มของฉัน" ด้านบน'));
+    wrap.appendChild(empty);
     return;
   }
 
   for (const g of data.myGroups) {
-    const card = el('div', { class:'border border-stone-200 rounded p-2.5 hover:bg-stone-50' });
-    card.appendChild(el('div', { class:'font-medium text-sm truncate', title: g.name }, g.name));
-    if (g.memberCountText) {
-      card.appendChild(el('div', { class:'text-xs text-stone-500' }, g.memberCountText));
-    }
-    const row = el('div', { class:'flex gap-2 mt-2 text-xs' });
-    row.appendChild(el('a', { href: g.url, target:'_blank', class:'px-2 py-1 rounded bg-stone-200 hover:bg-stone-300' }, 'เปิด'));
+    const card = el('div', { class:'border border-slate-200 rounded-lg p-3 hover:border-slate-300 hover:shadow-sm transition' });
+    card.appendChild(el('div', { class:'flex items-start gap-2 mb-2' },
+      (() => { const wrap = el('div', { class:'text-indigo-600 mt-0.5' }); wrap.appendChild(icon('users')); return wrap; })(),
+      el('div', { class:'flex-1 min-w-0' },
+        el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.name }, g.name),
+        g.memberCountText ? el('div', { class:'text-xs text-slate-500' }, g.memberCountText) : null
+      )
+    ));
+    const row = el('div', { class:'flex gap-2 mt-2' });
+    row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost' },
+      (() => { const i = icon('external-link'); return i; })(), 'เปิด'));
     const inAlready = inList.has(g.url);
     row.appendChild(el('button', {
-      class:'px-2 py-1 rounded ' + (inAlready ? 'bg-stone-200 text-stone-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'),
-      onclick: async () => {
-        if (inAlready) return;
-        await addGroup(g.url, g.name);
-        renderMyGroups();
-      }
-    }, inAlready ? '✓ อยู่ใน list แล้ว' : '+ เพิ่มเข้า Scan List'));
+      class: 'btn ' + (inAlready ? 'btn-ghost' : 'btn-success'),
+      onclick: async () => { if (!inAlready) { await addGroup(g.url, g.name); renderAll(); lucide.createIcons(); } }
+    },
+      (() => { const i = icon(inAlready ? 'check' : 'plus'); return i; })(),
+      inAlready ? 'ใน list แล้ว' : 'เพิ่มเข้า Scan List'
+    ));
     card.appendChild(row);
     wrap.appendChild(card);
   }
 }
 
-//
-// ---------- Search results ----------
-//
 function renderSearches() {
   const wrap = $('#search-results');
   wrap.innerHTML = '';
   if (data.searches.length === 0) {
-    wrap.appendChild(el('div', { class:'text-sm text-stone-400 text-center py-6' },
-      'ยังไม่ได้ค้น — พิมพ์ keyword ด้านบนแล้วกด "ค้นหา"'));
+    const empty = el('div', { class:'empty-state' });
+    const ic = el('div', { class:'icon icon-lg' });
+    ic.appendChild(icon('search'));
+    empty.appendChild(ic);
+    empty.appendChild(el('div', {}, 'ยังไม่ได้ค้น — พิมพ์ keyword ด้านบนแล้วกด "ค้นหา"'));
+    wrap.appendChild(empty);
     return;
   }
   const inList = new Set((config?.groups || []).map(g => g.url));
-  for (const s of data.searches.slice(0, 3)) { // show last 3 searches
-    const block = el('div', { class:'mb-3' });
+  for (const s of data.searches.slice(0, 3)) {
+    const block = el('div', { class:'mb-4' });
     const header = el('div', { class:'flex items-center justify-between mb-2' });
-    header.appendChild(el('h4', { class:'text-sm font-medium text-stone-600' },
+    header.appendChild(el('div', { class:'text-sm font-medium text-slate-700' },
       `ผลค้น "${s.query}" — ${s.results.length} กลุ่ม`));
     header.appendChild(el('button', {
-      class:'text-xs text-red-600 hover:text-red-800',
+      class:'btn btn-danger',
       onclick: async () => {
         if (!confirm('ลบผลค้นนี้?')) return;
         await fetch('/api/search/' + encodeURIComponent(s.file), { method:'DELETE' });
         refresh();
       }
-    }, 'ลบ'));
+    }, (() => icon('trash-2'))(), 'ลบ'));
     block.appendChild(header);
-    const grid = el('div', { class:'grid grid-cols-1 md:grid-cols-2 gap-2' });
+
+    const grid = el('div', { class:'grid grid-cols-1 md:grid-cols-2 gap-3' });
     for (const g of s.results) {
-      const card = el('div', { class:'border border-stone-200 rounded p-2.5 hover:bg-stone-50' });
-      card.appendChild(el('div', { class:'font-medium text-sm truncate', title: g.name }, g.name));
-      card.appendChild(el('div', { class:'text-xs text-stone-500' },
-        `${g.memberCountText || '?'} • ${g.privacy || ''}`));
-      const row = el('div', { class:'flex gap-2 mt-2 text-xs' });
-      row.appendChild(el('a', { href: g.url, target:'_blank', class:'px-2 py-1 rounded bg-stone-200 hover:bg-stone-300' }, 'เปิด'));
+      const card = el('div', { class:'border border-slate-200 rounded-lg p-3 hover:border-slate-300 hover:shadow-sm transition' });
+      card.appendChild(el('div', { class:'flex items-start gap-2 mb-2' },
+        (() => { const wrap = el('div', { class:'text-indigo-600 mt-0.5' }); wrap.appendChild(icon('users')); return wrap; })(),
+        el('div', { class:'flex-1 min-w-0' },
+          el('div', { class:'text-sm font-medium text-slate-900 truncate', title: g.name }, g.name),
+          el('div', { class:'text-xs text-slate-500' }, `${g.memberCountText || '?'} • ${g.privacy || ''}`)
+        )
+      ));
+      const row = el('div', { class:'flex gap-2' });
+      row.appendChild(el('a', { href: g.url, target:'_blank', class:'btn btn-ghost' },
+        (() => icon('external-link'))(), 'เปิด'));
       const inAlready = inList.has(g.url);
       row.appendChild(el('button', {
-        class:'px-2 py-1 rounded ' + (inAlready ? 'bg-stone-200 text-stone-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'),
-        onclick: async () => {
-          if (inAlready) return;
-          await addGroup(g.url, g.name);
-          renderSearches();
-        }
-      }, inAlready ? '✓ อยู่ใน list แล้ว' : '+ เพิ่มเข้า Scan List'));
+        class: 'btn ' + (inAlready ? 'btn-ghost' : 'btn-success'),
+        onclick: async () => { if (!inAlready) { await addGroup(g.url, g.name); renderAll(); lucide.createIcons(); } }
+      },
+        (() => icon(inAlready ? 'check' : 'plus'))(),
+        inAlready ? 'ใน list' : 'เพิ่ม'
+      ));
       card.appendChild(row);
       grid.appendChild(card);
     }
@@ -414,37 +569,46 @@ function renderSearches() {
   }
 }
 
-//
-// ---------- Scan summary ----------
-//
-function renderScanSummary() {
-  const ngroups = config?.groups?.length || 0;
-  const nkeys = config?.keywords?.length || 0;
-  const summary = $('#scan-summary');
-  const btn = $('#btn-scan');
-  if (ngroups === 0 || nkeys === 0) {
-    summary.innerHTML = `<span class="text-amber-700">ยังไม่พร้อม — ต้องการอย่างน้อย 1 กลุ่ม และ 1 keyword</span>`;
-    btn.disabled = true;
-    btn.classList.add('opacity-50','cursor-not-allowed');
-  } else {
-    summary.innerHTML = `จะ scan <b>${ngroups}</b> กลุ่ม หาคำ <b>${nkeys}</b> คำ`;
-    btn.disabled = false;
-    btn.classList.remove('opacity-50','cursor-not-allowed');
-  }
-}
+function postCard(p) {
+  const card = el('div', { class:'card p-4 hover:border-slate-300 transition' });
+  const top = el('div', { class:'flex items-start justify-between gap-3 mb-2' });
+  top.appendChild(el('div', { class:'flex-1 min-w-0' },
+    el('div', { class:'text-sm font-semibold text-slate-900' }, p.author || '(ไม่ทราบ)'),
+    el('div', { class:'text-xs text-slate-500 mt-0.5' },
+      (p.groupName || '') + (p.postedAt ? ' • ' + p.postedAt : '')
+    )
+  ));
+  top.appendChild(el('span', { class:`status-pill status-${p.status}` }, p.status));
+  card.appendChild(top);
 
-//
-// ---------- Posts ----------
-//
-function renderStats() {
-  const total = data.posts.length;
-  const by = data.posts.reduce((acc, p) => { acc[p.status] = (acc[p.status]||0)+1; return acc; }, {});
-  $('#stats').innerHTML =
-    `ทั้งหมด <b>${total}</b> · ` +
-    `ใหม่ <b>${by.new||0}</b> · ` +
-    `ติดต่อแล้ว <b>${by.contacted||0}</b> · ` +
-    `ปิดดีล <b class="text-emerald-700">${by.won||0}</b> · ` +
-    `Scan รัน <b>${data.scanFiles}</b> ครั้ง`;
+  card.appendChild(el('div', { class:'text-sm text-slate-700 whitespace-pre-wrap break-words my-2' },
+    (p.content || '').slice(0, 360) + ((p.content || '').length > 360 ? '…' : '')
+  ));
+
+  if (p.matchedKeywords?.length) {
+    const kw = el('div', { class:'flex flex-wrap gap-1 mb-3' });
+    for (const k of p.matchedKeywords) {
+      kw.appendChild(el('span', { class:'text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200' }, k));
+    }
+    card.appendChild(kw);
+  }
+
+  const actions = el('div', { class:'flex items-center gap-2 flex-wrap' });
+  actions.appendChild(el('a', { href: p.url, target:'_blank', class:'btn btn-primary' },
+    (() => icon('external-link'))(), 'เปิดใน Facebook'));
+  const opts = [
+    ['contacted','ติดต่อแล้ว'],
+    ['won','ปิดดีล'],
+    ['lost','ไม่สนใจ'],
+  ];
+  for (const [s, label] of opts) {
+    actions.appendChild(el('button', {
+      class:'btn btn-ghost',
+      onclick: () => setStatus(p.url, s)
+    }, label));
+  }
+  card.appendChild(actions);
+  return card;
 }
 
 function renderPosts() {
@@ -452,104 +616,123 @@ function renderPosts() {
     .filter(p => !filterStatus || p.status === filterStatus)
     .filter(p => !filterQ || (p.content || '').toLowerCase().includes(filterQ.toLowerCase()));
 
-  $('#posts').innerHTML = '';
+  $('#posts-meta').textContent = data.posts.length === 0
+    ? 'ยังไม่มีผลลัพธ์ — ตั้งค่ากลุ่มและ keyword แล้ว Scan'
+    : `แสดง ${list.length} / ${data.posts.length}`;
 
+  $('#posts').innerHTML = '';
   if (list.length === 0) {
-    $('#posts').appendChild(el('div', { class:'text-center text-stone-400 py-12 text-sm' },
-      data.posts.length === 0
-        ? 'ยังไม่มีผลลัพธ์ — ทำตาม Step 1-4 ด้านบน แล้วกด Scan'
-        : 'ไม่มีโพสต์ตรงฟิลเตอร์'));
+    const empty = el('div', { class:'card empty-state' });
+    const ic = el('div', { class:'icon icon-lg' });
+    ic.appendChild(icon('inbox'));
+    empty.appendChild(ic);
+    empty.appendChild(el('div', {}, data.posts.length === 0 ? 'ยังไม่มี lead — Scan ก่อน' : 'ไม่มีโพสต์ตรงฟิลเตอร์'));
+    $('#posts').appendChild(empty);
     return;
   }
+  for (const p of list) $('#posts').appendChild(postCard(p));
+}
 
-  for (const p of list) {
-    const card = el('div', { class:'border border-stone-200 rounded p-3 hover:bg-stone-50' });
-
-    const top = el('div', { class:'flex items-start justify-between gap-3 mb-2' });
-    top.appendChild(el('div', { class:'flex-1 min-w-0' },
-      el('div', { class:'text-sm font-medium' }, p.author || '(ไม่ทราบ)'),
-      el('div', { class:'text-xs text-stone-500' }, (p.groupName || '') + (p.postedAt ? ' • ' + p.postedAt : ''))
+function renderRecent() {
+  const wrap = $('#recent-posts');
+  wrap.innerHTML = '';
+  const recent = data.posts.slice(0, 5);
+  if (recent.length === 0) {
+    const empty = el('div', { class:'empty-state' });
+    const ic = el('div', { class:'icon icon-lg' });
+    ic.appendChild(icon('inbox'));
+    empty.appendChild(ic);
+    empty.appendChild(el('div', {}, 'ยังไม่มี lead — ทำ Setup ครบ 4 ข้อแล้ว Scan'));
+    wrap.appendChild(empty);
+    return;
+  }
+  for (const p of recent) {
+    const row = el('div', { class:'px-6 py-3 hover:bg-slate-50' });
+    row.appendChild(el('div', { class:'flex items-center gap-3' },
+      el('span', { class:`status-pill status-${p.status}` }, p.status),
+      el('div', { class:'flex-1 min-w-0' },
+        el('div', { class:'text-sm font-medium text-slate-900 truncate' }, p.author || '(ไม่ทราบ)'),
+        el('div', { class:'text-xs text-slate-500 truncate' }, p.content || '')
+      ),
+      el('a', { href: p.url, target:'_blank', class:'btn btn-ghost' },
+        (() => icon('external-link'))(), 'เปิด')
     ));
-    top.appendChild(el('span', { class:`text-xs px-2 py-0.5 rounded status-${p.status}` }, p.status));
-    card.appendChild(top);
-
-    card.appendChild(el('div', { class:'text-sm text-stone-700 whitespace-pre-wrap break-words mb-2' },
-      (p.content || '').slice(0, 400) + ((p.content || '').length > 400 ? '…' : '')));
-
-    const kw = el('div', { class:'flex flex-wrap gap-1 mb-2' });
-    for (const k of p.matchedKeywords || []) {
-      kw.appendChild(el('span', { class:'text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-900' }, k));
-    }
-    card.appendChild(kw);
-
-    const actions = el('div', { class:'flex items-center gap-2 text-xs flex-wrap' });
-    actions.appendChild(el('a', {
-      href: p.url, target:'_blank',
-      class:'px-2 py-1 rounded bg-stone-900 text-white hover:bg-stone-700'
-    }, 'เปิดใน Facebook'));
-    const statuses = [
-      ['contacted','ติดต่อแล้ว','bg-amber-100 text-amber-800 hover:bg-amber-200'],
-      ['won','ปิดดีล','bg-emerald-100 text-emerald-800 hover:bg-emerald-200'],
-      ['lost','ไม่สนใจ','bg-stone-100 text-stone-600 hover:bg-stone-200'],
-    ];
-    for (const [s, label, cls] of statuses) {
-      actions.appendChild(el('button', {
-        class:`px-2 py-1 rounded ${cls}`,
-        onclick: () => setStatus(p.url, s)
-      }, label));
-    }
-    card.appendChild(actions);
-    $('#posts').appendChild(card);
+    wrap.appendChild(row);
   }
 }
 
+function renderScanSummary() {
+  const ng = config?.groups?.length || 0;
+  const nk = config?.keywords?.length || 0;
+  const btn = $('#btn-scan');
+  if (ng === 0 || nk === 0) {
+    $('#scan-summary').innerHTML = `<span class="text-amber-600">ยังไม่พร้อม — ต้องมี 1+ กลุ่ม และ 1+ keyword</span>`;
+    btn.disabled = true;
+  } else {
+    $('#scan-summary').innerHTML = `พร้อม scan <b>${ng}</b> กลุ่ม หาคำ <b>${nk}</b> คำ`;
+    btn.disabled = false;
+  }
+}
+
+// ---------- mutations ----------
+async function saveConfig() {
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(config) });
+}
+async function addGroup(url, name) {
+  if (!config) return false;
+  if (!url || url.includes('REPLACE_WITH_GROUP_ID')) return false;
+  config.groups = config.groups || [];
+  if (config.groups.some(g => g.url === url)) return false;
+  config.groups.push({ url, name: name || url });
+  await saveConfig();
+  return true;
+}
+async function clearList() {
+  if (!confirm('ลบกลุ่มทั้งหมดออกจาก scan list?')) return;
+  config.groups = [];
+  await saveConfig();
+  renderAll(); lucide.createIcons();
+}
+async function addKeyword() {
+  const v = $('#keyword-input').value.trim();
+  if (!v) return;
+  config.keywords = config.keywords || [];
+  if (!config.keywords.includes(v)) {
+    config.keywords.push(v);
+    await saveConfig();
+  }
+  $('#keyword-input').value = '';
+  renderAll(); lucide.createIcons();
+}
 async function setStatus(url, status) {
   await fetch('/api/lead', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url, status }) });
   const p = data.posts.find(p => p.url === url);
   if (p) p.status = status;
-  renderStats();
-  renderPosts();
+  renderAll(); lucide.createIcons();
 }
 
-//
-// ---------- Jobs (SSE) ----------
-//
+// ---------- SSE jobs ----------
 let activeES = null;
 function openConsole(title) {
-  const c = $('#console');
-  c.classList.add('open');
-  c.classList.remove('hidden');
+  $('#console').classList.add('open');
   document.body.classList.add('console-open');
-  localStorage.setItem('consoleOpen', '1');
+  localStorage.setItem('consoleOpen','1');
   if (title != null) $('#console-title').textContent = title;
 }
 function closeConsole() {
-  const c = $('#console');
-  c.classList.remove('open');
-  c.classList.add('hidden');
+  $('#console').classList.remove('open');
   document.body.classList.remove('console-open');
-  localStorage.setItem('consoleOpen', '0');
+  localStorage.setItem('consoleOpen','0');
 }
-function toggleConsole() {
-  if ($('#console').classList.contains('open')) closeConsole();
-  else openConsole();
-}
-function showConsole(title) {
-  // for backwards compat — open + reset
-  openConsole(title);
-  $('#console-out').textContent = '';
-}
-function hideConsole() {
-  closeConsole();
-  if (activeES) { activeES.close(); activeES = null; }
-}
-function appendConsole(line, cls = '') {
-  const out = $('#console-out');
+function toggleConsole() { $('#console').classList.contains('open') ? closeConsole() : openConsole(); }
+
+function showConsole(title) { openConsole(title); $('#console-out').textContent = ''; }
+function appendConsole(line, cls='') {
   const span = document.createElement('div');
   span.className = 'console-line ' + cls;
   span.textContent = line;
-  out.appendChild(span);
-  out.scrollTop = out.scrollHeight;
+  $('#console-out').appendChild(span);
+  $('#console-out').scrollTop = $('#console-out').scrollHeight;
 }
 
 function runJob(command, arg, label) {
@@ -567,7 +750,7 @@ function runJob(command, arg, label) {
       else if (msg.type === 'stderr') appendConsole(msg.payload, 'text-amber-300');
       else if (msg.type === 'error')  appendConsole('✗ ' + msg.payload.message, 'text-red-400');
       else if (msg.type === 'done') {
-        appendConsole('✓ exited with code ' + msg.payload.code, msg.payload.code === 0 ? 'text-green-300' : 'text-red-400');
+        appendConsole('✓ exited code ' + msg.payload.code, msg.payload.code === 0 ? 'text-green-300' : 'text-red-400');
         es.close(); activeES = null;
         $('#job-indicator').textContent = '';
         refresh();
@@ -575,19 +758,32 @@ function runJob(command, arg, label) {
     } catch {}
   };
   es.onerror = () => {
-    appendConsole('— connection closed —', 'text-stone-500');
+    appendConsole('— connection closed —', 'text-slate-500');
     es.close(); activeES = null;
     $('#job-indicator').textContent = '';
     refresh();
   };
 }
 
-//
-// ---------- Wiring ----------
-//
-$('#btn-login').addEventListener('click', () => runJob('login', null, 'Login Facebook'));
+// ---------- Section nav ----------
+function switchSection(s) {
+  $$('[data-section]').forEach(el => el.classList.toggle('hidden', el.dataset.section !== s));
+  $$('[data-nav]').forEach(el => el.classList.toggle('active', el.dataset.nav === s));
+  localStorage.setItem('section', s);
+}
 
-$('#btn-mygroups').addEventListener('click', () => runJob('mygroups', null, 'List My Joined Groups'));
+function switchGroupTab(t) {
+  $$('[data-grouptab]').forEach(el => el.classList.toggle('active', el.dataset.grouptab === t));
+  $('#gtab-joined').classList.toggle('hidden', t !== 'joined');
+  $('#gtab-search').classList.toggle('hidden', t !== 'search');
+  $('#gtab-manual').classList.toggle('hidden', t !== 'manual');
+}
+
+// ---------- Wiring ----------
+$('#btn-login').addEventListener('click', () => runJob('login', null, 'Login Facebook'));
+$('#btn-mygroups').addEventListener('click', () => { switchSection('groups'); runJob('mygroups', null, 'โหลดกลุ่มของฉัน'); });
+$('#btn-mygroups-2').addEventListener('click', () => runJob('mygroups', null, 'โหลดกลุ่มของฉัน'));
+$('#btn-overview-search').addEventListener('click', () => switchSection('groups'));
 
 $('#btn-search').addEventListener('click', () => {
   const q = $('#search-q').value.trim();
@@ -601,43 +797,31 @@ $('#btn-manual-add').addEventListener('click', async () => {
   const n = $('#manual-name').value.trim();
   if (!u.startsWith('https://www.facebook.com/groups/')) { alert('URL ต้องเริ่มด้วย https://www.facebook.com/groups/'); return; }
   const ok = await addGroup(u, n);
-  if (ok) { $('#manual-url').value=''; $('#manual-name').value=''; }
+  if (ok) { $('#manual-url').value=''; $('#manual-name').value=''; renderAll(); lucide.createIcons(); }
 });
 
 $('#btn-clear-list').addEventListener('click', clearList);
-
 $('#btn-add-keyword').addEventListener('click', addKeyword);
 $('#keyword-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') addKeyword(); });
-
-$('#btn-scan').addEventListener('click', () => {
-  if ($('#btn-scan').disabled) return;
-  runJob('scan', null, 'Scan Groups');
-});
+$('#btn-scan').addEventListener('click', () => { if (!$('#btn-scan').disabled) runJob('scan', null, 'Scan Groups'); });
 
 $('#filter-status').addEventListener('change', (e) => { filterStatus = e.target.value; renderPosts(); });
 $('#filter-q').addEventListener('input', (e) => { filterQ = e.target.value; renderPosts(); });
 
-document.querySelectorAll('.grouptab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    activeGroupTab = btn.dataset.grouptab;
-    document.querySelectorAll('.grouptab-btn').forEach(b => {
-      const on = b.dataset.grouptab === activeGroupTab;
-      b.className = 'grouptab-btn px-3 py-2 border-b-2 ' +
-        (on ? 'border-stone-900 font-medium' : 'border-transparent text-stone-500 hover:text-stone-900');
-    });
-    $('#gtab-joined').classList.toggle('hidden', activeGroupTab !== 'joined');
-    $('#gtab-search').classList.toggle('hidden', activeGroupTab !== 'search');
-    $('#gtab-manual').classList.toggle('hidden', activeGroupTab !== 'manual');
-  });
-});
+$$('[data-nav]').forEach(el => el.addEventListener('click', () => switchSection(el.dataset.nav)));
+$$('[data-grouptab]').forEach(el => el.addEventListener('click', () => switchGroupTab(el.dataset.grouptab)));
 
+$('#console-toggle').addEventListener('click', toggleConsole);
 $('#console-close').addEventListener('click', closeConsole);
 $('#console-clear').addEventListener('click', () => { $('#console-out').textContent = ''; });
-$('#console-toggle').addEventListener('click', toggleConsole);
 
-// Restore last console open/close state
+// restore state
+const savedSection = localStorage.getItem('section');
+if (savedSection) switchSection(savedSection);
 if (localStorage.getItem('consoleOpen') === '1') openConsole();
 
+// init
+lucide.createIcons();
 refresh();
 setInterval(refresh, 10000);
 </script>
