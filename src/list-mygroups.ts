@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { Page } from 'playwright';
 import { openContext, hasExistingSession } from './lib/browser';
 import { humanDelay, humanScroll } from './lib/human';
 import { log } from './lib/logger';
@@ -6,11 +7,33 @@ import { saveResults } from './lib/session';
 import { extractGroupsFromPage, debugScreenshot } from './lib/fb-groups';
 import { SearchResult } from './types';
 
-const CANDIDATE_URLS = [
-  'https://www.facebook.com/groups/feed/',
-  'https://www.facebook.com/groups/?category=membership',
-  'https://www.facebook.com/groups/joins/',
-];
+/**
+ * On /groups/feed/ the sidebar lists "กลุ่มที่คุณเข้าร่วม" with a
+ * "ดูทั้งหมด" link that expands the section to show all joined
+ * groups. Click that if we can find it.
+ */
+async function expandJoinedGroupsSection(page: Page): Promise<boolean> {
+  const linkTexts = ['ดูทั้งหมด', 'See all', 'See all your groups'];
+  for (const text of linkTexts) {
+    try {
+      const els = await page.getByText(text, { exact: false }).all();
+      for (const e of els) {
+        const surround = await e.evaluate((el) => {
+          let n: Element | null = el as Element;
+          for (let i = 0; i < 6 && n; i++) n = n.parentElement;
+          return n ? (n as HTMLElement).innerText || '' : '';
+        }).catch(() => '');
+        if (/เข้าร่วม|joined|membership/i.test(surround)) {
+          await e.click({ timeout: 3000 }).catch(() => {});
+          log.ok(`  คลิก "${text}" สำเร็จ`);
+          await humanDelay(3000, 5000);
+          return true;
+        }
+      }
+    } catch { /* try next */ }
+  }
+  return false;
+}
 
 async function main(): Promise<void> {
   if (!hasExistingSession()) {
@@ -24,29 +47,42 @@ async function main(): Promise<void> {
 
   const merged = new Map<string, SearchResult>();
 
-  for (const target of CANDIDATE_URLS) {
+  // Try the most direct URL first
+  const urls = [
+    'https://www.facebook.com/groups/?category=membership',
+    'https://www.facebook.com/groups/feed/',
+    'https://www.facebook.com/groups/joins/',
+  ];
+
+  for (const target of urls) {
     log.info(`เปิด: ${target}`);
     try {
       await page.goto(target, { waitUntil: 'domcontentloaded' });
     } catch (err) {
-      log.warn(`  เปิด URL ไม่สำเร็จ: ${err instanceof Error ? err.message : err}`);
+      log.warn(`  เปิดไม่สำเร็จ: ${err instanceof Error ? err.message : err}`);
       continue;
     }
     await humanDelay(3000, 5000);
-    log.info(`  หน้าจริง: ${page.url()}`);
-    log.info(`  title: ${await page.title()}`);
+    log.info(`  URL จริง: ${page.url()}`);
 
-    // Scroll a few times — joined-groups list lazy-loads
-    for (let i = 0; i < 8; i++) {
-      const batch = await extractGroupsFromPage(page);
+    // First extraction — picks up anything in the sidebar
+    let batch = await extractGroupsFromPage(page);
+    for (const g of batch) if (!merged.has(g.url)) merged.set(g.url, g);
+    log.info(`  รอบแรก เจอ ${batch.length} (รวม ${merged.size})`);
+
+    // Try to expand "joined groups" if visible
+    await expandJoinedGroupsSection(page);
+
+    // Scroll and re-extract
+    for (let i = 0; i < 10 && merged.size < 100; i++) {
+      batch = await extractGroupsFromPage(page);
       for (const g of batch) if (!merged.has(g.url)) merged.set(g.url, g);
-      log.info(`  scroll ${i + 1}/8 — เจอ ${batch.length} กลุ่มในรอบนี้ (รวม ${merged.size})`);
-      if (merged.size >= 100) break;
-      await humanScroll(page, 1000);
+      log.info(`  scroll ${i + 1}/10 — รวม ${merged.size}`);
+      await humanScroll(page, 1200);
       await humanDelay(1500, 3000);
     }
 
-    if (merged.size > 0) break; // first URL that returns something wins
+    if (merged.size > 5) break; // got a useful batch, no need to try other URLs
   }
 
   await debugScreenshot(page, 'mygroups');
@@ -56,10 +92,13 @@ async function main(): Promise<void> {
   const filePath = saveResults(filename, all);
 
   if (all.length === 0) {
-    log.warn('ไม่เจอกลุ่มเลย — เช็ค data/screenshots/mygroups-*.png ว่าหน้าจริงเป็นอะไร');
-    log.warn('แล้วบอก Claude ให้ปรับ src/lib/fb-groups.ts ตามสิ่งที่เห็น');
+    log.warn('ไม่เจอกลุ่มเลย — ดู screenshot ที่ data/screenshots/mygroups-*.png');
   } else {
     log.ok(`บันทึก ${all.length} กลุ่มที่คุณเข้าอยู่ ที่ ${filePath}`);
+    log.info('ตัวอย่าง 10 กลุ่มแรก:');
+    for (const r of all.slice(0, 10)) {
+      log.ok(`  • ${r.name}`);
+    }
   }
 
   await context.close();
