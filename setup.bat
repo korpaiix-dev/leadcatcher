@@ -3,7 +3,7 @@ setlocal
 title LeadCatcher Setup
 
 echo ===============================================
-echo   LeadCatcher - one-click setup
+echo   LeadCatcher - setup and launch
 echo ===============================================
 echo.
 
@@ -18,11 +18,21 @@ ren .git_seed .git
 echo [OK] Restored .git from seed.
 :skip_seed
 
-REM ---------- Step 3: clean stray .lock files ----------
+REM ---------- Step 3: clean stray .lock files + npm trash dirs ----------
 if exist .git\config.lock     del /q .git\config.lock
 if exist .git\config.lock.bak del /q .git\config.lock.bak
 if exist .git\index.lock      del /q .git\index.lock
 if exist .git\index.lock.bak  del /q .git\index.lock.bak
+
+REM Remove leftover npm install temp dirs from sandbox runs
+if exist node_modules\.acorn-* for /d %%D in (node_modules\.acorn-*) do rmdir /s /q "%%D"
+if exist node_modules\.mime-* for /d %%D in (node_modules\.mime-*) do rmdir /s /q "%%D"
+if exist node_modules\.is-docker-* for /d %%D in (node_modules\.is-docker-*) do rmdir /s /q "%%D"
+if exist node_modules\.playwright-* for /d %%D in (node_modules\.playwright-*) do rmdir /s /q "%%D"
+if exist node_modules\.ts-node-* for /d %%D in (node_modules\.ts-node-*) do rmdir /s /q "%%D"
+if exist node_modules\.typescript-* for /d %%D in (node_modules\.typescript-*) do rmdir /s /q "%%D"
+if exist node_modules\.express-* for /d %%D in (node_modules\.express-*) do rmdir /s /q "%%D"
+if exist node_modules\.open-* for /d %%D in (node_modules\.open-*) do rmdir /s /q "%%D"
 
 REM ---------- Step 4: ensure git repo exists ----------
 git rev-parse --git-dir >nul 2>&1
@@ -38,19 +48,14 @@ git config core.autocrlf true
 git config core.filemode false
 echo [OK] Git repo ready.
 
-REM ---------- Step 5: npm install ----------
-REM Check for the Windows .cmd shim, not just the package folder, because
-REM installs done from a Linux sandbox leave node_modules without .cmd shims.
-if exist node_modules\.bin\ts-node.cmd goto skip_npm
+REM ---------- Step 5: npm install (always run — fast if cached) ----------
 echo.
-echo [..] Running npm install (this may take 30-60 seconds)...
+echo [..] Running npm install (10-60 seconds)...
 call npm install --no-audit --no-fund --loglevel=error
 if errorlevel 1 goto npm_fail
-:skip_npm
 echo [OK] npm dependencies ready.
 
 REM ---------- Step 6: playwright install chromium ----------
-REM Always run — playwright detects what's already installed and skips. Fast.
 echo.
 echo [..] Ensuring Chromium for Playwright is installed...
 call npx --yes playwright install chromium
@@ -60,18 +65,20 @@ echo [OK] Chromium ready.
 REM ---------- Step 7: create config.json from template ----------
 if exist config.json goto skip_config
 copy /Y config.example.json config.json >nul
-echo [OK] Created config.json (please edit it before running scans).
+echo [OK] Created config.json.
 :skip_config
 
 echo.
 echo ===============================================
-echo   Setup complete!
+echo   Setup complete — starting dashboard...
 echo ===============================================
 echo.
-echo To launch the dashboard, double-click launch.bat
-echo (or run: npm run dashboard)
+echo Dashboard will open at http://localhost:3737
+echo (Close this window to stop the dashboard)
 echo.
-pause
+
+REM ---------- Step 8: launch the dashboard ----------
+call npm run dashboard
 goto end
 
 :npm_fail
