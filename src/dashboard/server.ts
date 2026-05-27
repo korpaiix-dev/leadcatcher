@@ -193,6 +193,17 @@ app.get('/api/run', (req, res) => {
   });
 });
 
+app.delete('/api/search/:file', (req, res) => {
+  const file = req.params.file;
+  // safety: only allow files that match our naming convention
+  if (!/^search-[\w฀-๿_]+-\d+\.json$/.test(file) && !/^mygroups-\d+\.json$/.test(file)) {
+    return res.status(400).json({ error: 'bad filename' });
+  }
+  const fp = path.join(RESULTS_DIR, file);
+  if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  res.json({ ok: true });
+});
+
 app.get('/api/status', (_req, res) => {
   res.json({ running: runningJobName });
 });

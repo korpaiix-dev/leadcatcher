@@ -377,8 +377,18 @@ function renderSearches() {
   const inList = new Set((config?.groups || []).map(g => g.url));
   for (const s of data.searches.slice(0, 3)) { // show last 3 searches
     const block = el('div', { class:'mb-3' });
-    block.appendChild(el('h4', { class:'text-sm font-medium mb-2 text-stone-600' },
+    const header = el('div', { class:'flex items-center justify-between mb-2' });
+    header.appendChild(el('h4', { class:'text-sm font-medium text-stone-600' },
       `ผลค้น "${s.query}" — ${s.results.length} กลุ่ม`));
+    header.appendChild(el('button', {
+      class:'text-xs text-red-600 hover:text-red-800',
+      onclick: async () => {
+        if (!confirm('ลบผลค้นนี้?')) return;
+        await fetch('/api/search/' + encodeURIComponent(s.file), { method:'DELETE' });
+        refresh();
+      }
+    }, 'ลบ'));
+    block.appendChild(header);
     const grid = el('div', { class:'grid grid-cols-1 md:grid-cols-2 gap-2' });
     for (const g of s.results) {
       const card = el('div', { class:'border border-stone-200 rounded p-2.5 hover:bg-stone-50' });

@@ -1,35 +1,16 @@
 import 'dotenv/config';
-import { Locator } from 'playwright';
 import { openContext, hasExistingSession } from './lib/browser';
 import { humanDelay, humanScroll } from './lib/human';
 import { log } from './lib/logger';
 import { saveResults } from './lib/session';
+import { extractGroupsFromPage, debugScreenshot } from './lib/fb-groups';
 import { SearchResult } from './types';
 
-async function extractCard(card: Locator): Promise<SearchResult | null> {
-  const links = await card.locator('a[href*="/groups/"]').all();
-  if (links.length === 0) return null;
-
-  let groupUrl = '';
-  let name = '';
-  for (const link of links) {
-    const href = await link.getAttribute('href', { timeout: 500 }).catch(() => null);
-    const text = (await link.textContent({ timeout: 500 }).catch(() => null) || '').trim();
-    if (href && !groupUrl) {
-      groupUrl = (href.startsWith('http') ? href : 'https://www.facebook.com' + href).split('?')[0];
-    }
-    if (text && text.length > 1 && !name) name = text;
-    if (groupUrl && name) break;
-  }
-  if (!groupUrl) return null;
-
-  const fullText = (await card.textContent().catch(() => '')) || '';
-  let memberCountText = '';
-  const m = fullText.match(/([\d][\d,\.]*\s*[KkMm]?)\s*(?:สมาชิก|members?)/);
-  if (m) memberCountText = m[1].trim() + ' สมาชิก';
-
-  return { name: name || groupUrl, url: groupUrl, memberCountText, privacy: 'unknown' };
-}
+const CANDIDATE_URLS = [
+  'https://www.facebook.com/groups/feed/',
+  'https://www.facebook.com/groups/?category=membership',
+  'https://www.facebook.com/groups/joins/',
+];
 
 async function main(): Promise<void> {
   if (!hasExistingSession()) {
@@ -41,47 +22,45 @@ async function main(): Promise<void> {
   const context = await openContext(false);
   const page = context.pages()[0] || (await context.newPage());
 
-  // The user's "Groups you've joined" page
-  await page.goto('https://www.facebook.com/groups/joins/', { waitUntil: 'domcontentloaded' });
-  await humanDelay(3000, 6000);
+  const merged = new Map<string, SearchResult>();
 
-  const results: SearchResult[] = [];
-  const seen = new Set<string>();
-  const maxResults = 100;
-  const maxScrolls = 15;
-
-  for (let scroll = 0; scroll < maxScrolls && results.length < maxResults; scroll++) {
-    const containers = ['[role="main"] [role="article"]', '[role="main"] div[role="feed"] > div'];
-    let cards: Locator | null = null;
-    for (const sel of containers) {
-      const loc = page.locator(sel);
-      if ((await loc.count()) > 1) { cards = loc; break; }
+  for (const target of CANDIDATE_URLS) {
+    log.info(`เปิด: ${target}`);
+    try {
+      await page.goto(target, { waitUntil: 'domcontentloaded' });
+    } catch (err) {
+      log.warn(`  เปิด URL ไม่สำเร็จ: ${err instanceof Error ? err.message : err}`);
+      continue;
     }
-    if (!cards) {
-      log.warn('ไม่พบ container กลุ่ม — อาจต้องอัปเดต selector');
-      break;
-    }
+    await humanDelay(3000, 5000);
+    log.info(`  หน้าจริง: ${page.url()}`);
+    log.info(`  title: ${await page.title()}`);
 
-    const count = await cards.count();
-    log.info(`Scroll ${scroll + 1}/${maxScrolls} — เจอ ${count} cards (รวมแล้ว ${results.length})`);
-
-    for (let i = 0; i < count && results.length < maxResults; i++) {
-      const extracted = await extractCard(cards.nth(i));
-      if (!extracted) continue;
-      if (seen.has(extracted.url)) continue;
-      seen.add(extracted.url);
-      results.push(extracted);
-      log.ok(`  ${results.length}. ${extracted.name}`);
+    // Scroll a few times — joined-groups list lazy-loads
+    for (let i = 0; i < 8; i++) {
+      const batch = await extractGroupsFromPage(page);
+      for (const g of batch) if (!merged.has(g.url)) merged.set(g.url, g);
+      log.info(`  scroll ${i + 1}/8 — เจอ ${batch.length} กลุ่มในรอบนี้ (รวม ${merged.size})`);
+      if (merged.size >= 100) break;
+      await humanScroll(page, 1000);
+      await humanDelay(1500, 3000);
     }
 
-    if (results.length >= maxResults) break;
-    await humanScroll(page, 1000);
-    await humanDelay(2000, 4000);
+    if (merged.size > 0) break; // first URL that returns something wins
   }
 
+  await debugScreenshot(page, 'mygroups');
+
+  const all = Array.from(merged.values());
   const filename = `mygroups-${Date.now()}.json`;
-  const filePath = saveResults(filename, results);
-  log.ok(`บันทึก ${results.length} กลุ่มที่คุณเข้าอยู่ ที่ ${filePath}`);
+  const filePath = saveResults(filename, all);
+
+  if (all.length === 0) {
+    log.warn('ไม่เจอกลุ่มเลย — เช็ค data/screenshots/mygroups-*.png ว่าหน้าจริงเป็นอะไร');
+    log.warn('แล้วบอก Claude ให้ปรับ src/lib/fb-groups.ts ตามสิ่งที่เห็น');
+  } else {
+    log.ok(`บันทึก ${all.length} กลุ่มที่คุณเข้าอยู่ ที่ ${filePath}`);
+  }
 
   await context.close();
 }
