@@ -91,6 +91,7 @@
       <span class="nav-link" data-nav="groups"><i data-lucide="users"></i>Groups <span id="nav-group-count" class="text-xs opacity-70"></span></span>
       <span class="nav-link" data-nav="keywords"><i data-lucide="tags"></i>Keywords <span id="nav-kw-count" class="text-xs opacity-70"></span></span>
       <span class="nav-link" data-nav="posts"><i data-lucide="inbox"></i>Lead Posts <span id="nav-post-count" class="text-xs opacity-70"></span></span>
+      <span class="nav-link" data-nav="share"><i data-lucide="send"></i>Share Post</span>
     </nav>
 
     <!-- Right side -->
@@ -285,6 +286,54 @@
     </div>
   </div>
   <div id="posts" class="space-y-3"></div>
+</section>
+
+<!-- ============== SHARE POST PAGE ============== -->
+<section data-section="share" class="space-y-6 hidden">
+  <div>
+    <h1 class="text-xl font-bold text-slate-900">Share Post</h1>
+    <p class="text-sm text-slate-500 mt-1">โพสต์ข้อความไปยังหลายกลุ่มทีเดียว — เหมาะกับเสนอบริการ / โปรโมชั่น</p>
+  </div>
+
+  <!-- Warning banner -->
+  <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-900 flex items-start gap-2">
+    <i data-lucide="alert-triangle" class="text-red-600 mt-0.5 shrink-0"></i>
+    <div>
+      <b>⚠️ ความเสี่ยงสูง — อ่านก่อนใช้</b>
+      <ul class="mt-2 ml-5 list-disc space-y-1 text-xs">
+        <li>โพสต์ข้อความเดียวกันหลายกลุ่มใน 1 วัน FB จับเป็น <b>spam</b> ทันที</li>
+        <li>แนะนำ <b>safe mode</b> — ระบบหยุดให้คุณกด Post เอง + delay 5-15 นาทีระหว่างกลุ่ม</li>
+        <li>เริ่มจาก 3-5 กลุ่ม/วันก่อน ดูว่า account ปลอดภัย แล้วค่อยเพิ่ม</li>
+        <li>ถ้าเจอ CAPTCHA หรือ "Posting too fast" → <b>หยุดทันที 24 ชม.</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Message composer -->
+  <div class="card p-6 space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-2">ข้อความที่จะโพสต์</label>
+      <textarea id="share-message" rows="6" class="input" placeholder='เช่น "รับงานถ่าย prewedding สิ้นเดือนนี้ ยังว่าง 2 คิว ราคาเริ่ม 8,xxx สนใจทักได้ครับ"'></textarea>
+      <p class="text-xs text-slate-400 mt-1"><span id="share-msg-count">0</span> ตัวอักษร</p>
+    </div>
+
+    <!-- Group selection -->
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-2">เลือกกลุ่มที่จะโพสต์ (จาก Scan List)</label>
+      <div class="flex items-center gap-2 mb-2">
+        <button id="share-select-all" class="btn btn-ghost"><i data-lucide="check-circle"></i>เลือกทั้งหมด</button>
+        <button id="share-deselect-all" class="btn btn-ghost"><i data-lucide="x-circle"></i>ยกเลิก</button>
+        <span class="text-xs text-slate-500" id="share-selected-count">เลือกแล้ว 0 กลุ่ม</span>
+      </div>
+      <div id="share-group-list" class="border border-slate-200 rounded-lg max-h-64 overflow-y-auto divide-y divide-slate-100"></div>
+    </div>
+
+    <!-- Action -->
+    <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+      <p id="share-summary" class="text-sm text-slate-600">เลือกกลุ่ม + พิมพ์ข้อความก่อน</p>
+      <button id="btn-share" class="btn btn-success" disabled><i data-lucide="send"></i>เริ่ม Share Post</button>
+    </div>
+  </div>
 </section>
 
 </main>
@@ -988,6 +1037,101 @@ $('#console-clear').addEventListener('click', () => { $('#console-out').textCont
 const savedSection = localStorage.getItem('section');
 if (savedSection) switchSection(savedSection);
 if (localStorage.getItem('consoleOpen') === '1') openConsole();
+
+// ---------- Share Post ----------
+const shareSelected = new Set();
+
+function renderShareGroups() {
+  const wrap = $('#share-group-list');
+  wrap.innerHTML = '';
+  const groups = config?.groups || [];
+  if (groups.length === 0) {
+    wrap.appendChild(el('div', { class:'empty-state' },
+      el('div', { class:'icon icon-lg' }, icon('users-x')),
+      el('div', {}, 'ยังไม่มีกลุ่มใน Scan List — ไปเพิ่มที่ tab Groups ก่อน')
+    ));
+    return;
+  }
+  for (const g of groups) {
+    const isOn = shareSelected.has(g.url);
+    const row = el('div', {
+      class:'px-4 py-2 flex items-center gap-3 hover:bg-slate-50 cursor-pointer',
+      onclick: () => {
+        if (isOn) shareSelected.delete(g.url);
+        else shareSelected.add(g.url);
+        renderShareGroups(); updateShareSummary(); lucide.createIcons();
+      }
+    });
+    row.appendChild(el('div', { class: isOn ? 'text-emerald-600' : 'text-slate-300' },
+      icon(isOn ? 'check-square' : 'square')));
+    row.appendChild(el('div', { class:'flex-1 min-w-0' },
+      el('div', { class:'text-sm font-medium text-slate-900 truncate' }, g.name || g.url)
+    ));
+    wrap.appendChild(row);
+  }
+}
+
+function updateShareSummary() {
+  const msg = $('#share-message').value.trim();
+  const n = shareSelected.size;
+  $('#share-msg-count').textContent = msg.length;
+  $('#share-selected-count').textContent = `เลือกแล้ว ${n} กลุ่ม`;
+  const btn = $('#btn-share');
+  if (msg.length < 5 || n === 0) {
+    $('#share-summary').textContent = msg.length < 5
+      ? 'ข้อความสั้นเกินไป (ต้อง 5+ ตัวอักษร)'
+      : 'ยังไม่ได้เลือกกลุ่ม';
+    btn.disabled = true;
+  } else {
+    const mins = n * 10; // 10 min average per group
+    $('#share-summary').textContent = `จะโพสต์ "${msg.slice(0,40)}..." ลง ${n} กลุ่ม (~${mins} นาที)`;
+    btn.disabled = false;
+  }
+}
+
+$('#share-message').addEventListener('input', updateShareSummary);
+$('#share-select-all').addEventListener('click', () => {
+  for (const g of (config?.groups || [])) shareSelected.add(g.url);
+  renderShareGroups(); updateShareSummary(); lucide.createIcons();
+});
+$('#share-deselect-all').addEventListener('click', () => {
+  shareSelected.clear();
+  renderShareGroups(); updateShareSummary(); lucide.createIcons();
+});
+$('#btn-share').addEventListener('click', async () => {
+  if ($('#btn-share').disabled) return;
+  const msg = $('#share-message').value.trim();
+  const selectedGroups = (config?.groups || []).filter(g => shareSelected.has(g.url));
+  if (selectedGroups.length === 0 || msg.length < 5) return;
+
+  const confirmText =
+    `แน่ใจมั้ย? จะโพสต์ข้อความนี้ลง ${selectedGroups.length} กลุ่ม\n\n` +
+    `"${msg.slice(0, 200)}${msg.length>200?'...':''}"\n\n` +
+    `Mode: ${config.join?.mode || 'safe'} (delay 5-15 นาทีระหว่างกลุ่ม)\n` +
+    `ใช้เวลาประมาณ ${selectedGroups.length * 10} นาที`;
+  if (!confirm(confirmText)) return;
+
+  // Temporarily replace config.groups so the share script uses only selected ones
+  const originalGroups = config.groups;
+  config.groups = selectedGroups;
+  await saveConfig();
+
+  runJob('share', msg, `Share to ${selectedGroups.length} groups`);
+
+  // restore the original full scan list after the job kicks off
+  setTimeout(async () => {
+    config.groups = originalGroups;
+    await saveConfig();
+  }, 5000);
+});
+
+// Refresh share section when section becomes active OR config changes
+const oldRenderAll = renderAll;
+renderAll = function() {
+  oldRenderAll();
+  renderShareGroups();
+  updateShareSummary();
+};
 
 // init
 lucide.createIcons();

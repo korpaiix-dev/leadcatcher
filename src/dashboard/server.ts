@@ -134,7 +134,7 @@ app.get('/api/results', (_req, res) => {
 });
 
 // ---------- Run a CLI command (Server-Sent Events) ----------
-const ALLOWED = new Set(['login', 'scan', 'search', 'join', 'mygroups']);
+const ALLOWED = new Set(['login', 'scan', 'search', 'join', 'mygroups', 'share']);
 
 app.get('/api/run', (req, res) => {
   const command = String(req.query.command || '');

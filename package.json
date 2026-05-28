@@ -11,7 +11,8 @@
     "mygroups": "ts-node src/list-mygroups.ts",
     "dashboard": "ts-node src/dashboard/server.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "tsc",
+    "share": "ts-node src/share-post.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
